@@ -3,7 +3,6 @@
 //! This module contains the logic for initializing a new counter account.
 
 use anchor_lang::prelude::*;
-use crate::state::Counter;
 use crate::events::CounterInitialized;
 use super::Initialize;
 
