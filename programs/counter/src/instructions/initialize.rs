@@ -21,7 +21,7 @@ use super::Initialize;
 /// # Events
 /// * Emits `CounterInitialized` event with counter details
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-    let counter = &mut ctx.accounts.counter;
+    let counter  = &mut ctx.accounts.counter;
     let clock = Clock::get()?;
     
     // Initialize the counter with the user as authority
