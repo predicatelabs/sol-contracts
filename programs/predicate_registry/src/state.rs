@@ -53,7 +53,7 @@ pub struct PolicyAccount {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Task {
     /// Unique identifier for the task
-    pub uuid: String,
+    pub uuid: [u8; 16],
     /// The message sender
     pub msg_sender: Pubkey,
     /// The target address
