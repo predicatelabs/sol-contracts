@@ -62,8 +62,9 @@ pub struct Task {
     pub msg_value: u64,
     /// Encoded signature and arguments
     pub encoded_sig_and_args: Vec<u8>,
-    /// The policy identifier
-    pub policy: String,
+    /// The policy identifier (max 200 bytes)
+    #[max_len(200)]
+    pub policy: Vec<u8>,
     /// Expiration timestamp
     pub expiration: i64,
 }
