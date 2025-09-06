@@ -183,6 +183,13 @@ impl PolicyAccount {
 
 
 impl Task {
+    /// Get the active policy as a slice (trimming trailing zeros)
+    pub fn get_policy(&self) -> &[u8] {
+        // Find the first null byte or use full array
+        let end = self.policy.iter().position(|&b| b == 0).unwrap_or(200);
+        &self.policy[..end]
+    }
+
     /// Hash the task for signature verification (equivalent to hashTaskSafe in Solidity)
     pub fn hash_task_safe(&self, validator: Pubkey) -> [u8; 32] {
         use anchor_lang::solana_program::hash::hash;
@@ -193,7 +200,7 @@ impl Task {
         data.extend_from_slice(&validator.to_bytes()); // equivalent to msg.sender in Solidity
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(&self.policy);
+        data.extend_from_slice(self.get_policy());
         data.extend_from_slice(&self.expiration.to_le_bytes());
         
         hash(&data).to_bytes()
@@ -209,7 +216,7 @@ impl Task {
         data.extend_from_slice(&self.target.to_bytes());
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(&self.policy);
+        data.extend_from_slice(self.get_policy());
         data.extend_from_slice(&self.expiration.to_le_bytes());
         
         hash(&data).to_bytes()

@@ -55,7 +55,7 @@ pub fn validate_attestation(
 
     // Verify the policy matches
     require!(
-        task.policy == policy_account.policy,
+        task.get_policy() == policy_account.get_policy(),
         PredicateRegistryError::InvalidPolicy
     );
 
@@ -83,7 +83,7 @@ pub fn validate_attestation(
         target: task.target,
         attestor: attestation.attestor,
         msg_value: task.msg_value,
-        policy: String::from_utf8_lossy(&task.policy).to_string(),
+        policy: String::from_utf8_lossy(task.get_policy()).to_string(),
         uuid: hex::encode(task.uuid),
         expiration: task.expiration,
         timestamp: clock.unix_timestamp,
