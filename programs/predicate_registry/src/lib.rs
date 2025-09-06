@@ -15,6 +15,11 @@
 //! - Signature verification ensures attestation authenticity
 //! - Expiration timestamps prevent stale attestations
 
+// Suppress warnings from Anchor's internal behavior
+// These are framework-level warnings, not from our code
+#![allow(deprecated)]
+#![allow(ambiguous_glob_reexports)]
+
 use anchor_lang::prelude::*;
 
 // Import our modules
