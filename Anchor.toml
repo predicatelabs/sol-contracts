@@ -12,20 +12,17 @@ predicate_registry = "PredicateRegistry11111111111111111111111111"
 predicate_registry = "PredicateRegistry11111111111111111111111111"
 
 [registry]
-url = "https://api.apr.dev"
+url = "http://127.0.0.1:8899"
 
 [provider]
-cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
 
 [test.validator]
-url = "https://api.devnet.solana.com"
-
-[[test.validator.clone]]
-address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+url = "http://127.0.0.1:8899"
 
 [test]
 startup_wait = 5000

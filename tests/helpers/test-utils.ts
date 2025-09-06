@@ -93,7 +93,7 @@ export async function initializeRegistry(
       registry: registryPda,
       authority: authority.publicKey,
       systemProgram: SystemProgram.programId,
-    })
+    } as any)
     .signers([authority])
     .rpc();
 }
@@ -139,7 +139,7 @@ export async function setPolicy(
       policyAccount: policyPda,
       client: client.publicKey,
       systemProgram: SystemProgram.programId,
-    })
+    } as any)
     .signers([client])
     .rpc();
 }

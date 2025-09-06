@@ -32,7 +32,7 @@ describe("Registry Initialization", () => {
           registry: pdas.registryPda,
           authority: accounts.authority.publicKey,
           systemProgram: SystemProgram.programId,
-        })
+        } as any)
         .signers([accounts.authority])
         .rpc();
 
@@ -51,7 +51,7 @@ describe("Registry Initialization", () => {
     });
 
     it("Should emit RegistryInitialized event", async () => {
-      const listener = program.addEventListener("RegistryInitialized", (event) => {
+      const listener = program.addEventListener("registryInitialized", (event) => {
         expect(event.registry.toString()).to.equal(pdas.registryPda.toString());
         expect(event.authority.toString()).to.equal(accounts.authority.publicKey.toString());
         expect(event.timestamp.toNumber()).to.be.greaterThan(0);
@@ -63,7 +63,7 @@ describe("Registry Initialization", () => {
           registry: pdas.registryPda,
           authority: accounts.authority.publicKey,
           systemProgram: SystemProgram.programId,
-        })
+        } as any)
         .signers([accounts.authority])
         .rpc();
 
@@ -78,7 +78,7 @@ describe("Registry Initialization", () => {
           registry: pdas.registryPda,
           authority: accounts.authority.publicKey,
           systemProgram: SystemProgram.programId,
-        })
+        } as any)
         .signers([accounts.authority])
         .rpc();
 
@@ -103,12 +103,12 @@ describe("Registry Initialization", () => {
             registry: pdas.registryPda,
             authority: poorAuthority.publicKey,
             systemProgram: SystemProgram.programId,
-          })
+          } as any)
           .signers([poorAuthority])
           .rpc();
         
         expect.fail("Should have thrown an error");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include("insufficient");
       }
     });
@@ -121,7 +121,7 @@ describe("Registry Initialization", () => {
           registry: pdas.registryPda,
           authority: accounts.authority.publicKey,
           systemProgram: SystemProgram.programId,
-        })
+        } as any)
         .signers([accounts.authority])
         .rpc();
 
@@ -133,12 +133,12 @@ describe("Registry Initialization", () => {
             registry: pdas.registryPda,
             authority: accounts.newAuthority.publicKey,
             systemProgram: SystemProgram.programId,
-          })
+          } as any)
           .signers([accounts.newAuthority])
           .rpc();
         
         expect.fail("Should have thrown an error");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include("already in use");
       }
     });
@@ -151,12 +151,12 @@ describe("Registry Initialization", () => {
             registry: pdas.registryPda,
             authority: accounts.authority.publicKey,
             systemProgram: accounts.authority.publicKey, // Invalid system program
-          })
+          } as any)
           .signers([accounts.authority])
           .rpc();
         
         expect.fail("Should have thrown an error");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include("InvalidProgramId");
       }
     });
@@ -170,7 +170,7 @@ describe("Registry Initialization", () => {
           registry: pdas.registryPda,
           authority: accounts.authority.publicKey,
           systemProgram: SystemProgram.programId,
-        })
+        } as any)
         .signers([accounts.authority])
         .rpc();
     });
