@@ -3,15 +3,12 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-counter = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 predicate_registry = "PredicateRegistry11111111111111111111111111"
 
 [programs.devnet]
-counter = "7mKHTX4nCUqycrTCxQtgzu9BFmpb2taFJ2ieGqmzxqva"
 predicate_registry = "PredicateRegistry11111111111111111111111111"
 
 [programs.mainnet]
-counter = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 predicate_registry = "PredicateRegistry11111111111111111111111111"
 
 [registry]

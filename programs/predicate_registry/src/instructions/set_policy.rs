@@ -9,11 +9,11 @@ use crate::errors::PredicateRegistryError;
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `policy` - The policy string to set
+/// * `policy` - The policy data to set
 /// 
 /// # Returns
 /// * `Result<()>` - Success or error
-pub fn set_policy(ctx: Context<SetPolicy>, policy: String) -> Result<()> {
+pub fn set_policy(ctx: Context<SetPolicy>, policy: Vec<u8>) -> Result<()> {
     require!(!policy.is_empty(), PredicateRegistryError::InvalidPolicy);
     require!(policy.len() <= 200, PredicateRegistryError::PolicyTooLong);
 
@@ -23,18 +23,18 @@ pub fn set_policy(ctx: Context<SetPolicy>, policy: String) -> Result<()> {
     let clock = Clock::get()?;
 
     // Initialize new policy account
-    policy_account.initialize(client.key(), policy.clone(), &clock)?;
+    policy_account.initialize(client.key(), &policy, &clock)?;
 
     // Emit policy set event
     emit!(PolicySet {
         registry: registry.key(),
         client: client.key(),
         setter: client.key(),
-        policy: policy.clone(),
+        policy: String::from_utf8_lossy(&policy).to_string(),
         timestamp: clock.unix_timestamp,
     });
 
-    msg!("Policy set for client {}: {}", client.key(), policy);
+    msg!("Policy set for client {}: {}", client.key(), String::from_utf8_lossy(&policy));
     
     Ok(())
 }

@@ -9,11 +9,11 @@ use crate::errors::PredicateRegistryError;
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `policy` - The new policy string to set
+/// * `policy` - The new policy data to set
 /// 
 /// # Returns
 /// * `Result<()>` - Success or error
-pub fn update_policy(ctx: Context<UpdatePolicy>, policy: String) -> Result<()> {
+pub fn update_policy(ctx: Context<UpdatePolicy>, policy: Vec<u8>) -> Result<()> {
     require!(!policy.is_empty(), PredicateRegistryError::InvalidPolicy);
     require!(policy.len() <= 200, PredicateRegistryError::PolicyTooLong);
 
@@ -22,21 +22,21 @@ pub fn update_policy(ctx: Context<UpdatePolicy>, policy: String) -> Result<()> {
     let client = &ctx.accounts.client;
     let clock = Clock::get()?;
 
-    let previous_policy = policy_account.policy.clone();
+    let previous_policy = String::from_utf8_lossy(policy_account.get_policy()).to_string();
 
     // Update the policy
-    policy_account.update_policy(policy.clone(), &clock)?;
+    policy_account.update_policy(&policy, &clock)?;
 
     // Emit policy updated event
     emit!(PolicyUpdated {
         registry: registry.key(),
         client: client.key(),
         previous_policy,
-        new_policy: policy.clone(),
+        new_policy: String::from_utf8_lossy(&policy).to_string(),
         timestamp: clock.unix_timestamp,
     });
 
-    msg!("Policy updated for client {}: {}", client.key(), policy);
+    msg!("Policy updated for client {}: {}", client.key(), String::from_utf8_lossy(&policy));
     
     Ok(())
 }

@@ -4,15 +4,15 @@
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Counter } from "../target/types/counter";
+import { PredicateRegistry } from "../target/types/predicate_registry";
 
 module.exports = async function (provider) {
   // Configure client to use the provider.
   anchor.setProvider(provider);
 
-  console.log("Deploying Counter program...");
+  console.log("Deploying Predicate Registry program...");
   
-  const program = anchor.workspace.Counter as Program<Counter>;
+  const program = anchor.workspace.PredicateRegistry as Program<PredicateRegistry>;
   
   // Get the program ID
   const programId = program.programId;
@@ -36,7 +36,7 @@ module.exports = async function (provider) {
     }
   }
   
-  console.log("✅ Counter program deployment configuration complete!");
+  console.log("✅ Predicate Registry program deployment configuration complete!");
   console.log("\nNext steps:");
   console.log("1. Run 'anchor build' to compile the program");
   console.log("2. Run 'anchor deploy' to deploy to the configured cluster");

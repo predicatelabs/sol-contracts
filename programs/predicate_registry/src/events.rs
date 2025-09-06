@@ -109,20 +109,4 @@ pub struct PolicyUpdated {
     pub timestamp: i64,
 }
 
-/// Event emitted when an attestor makes an attestation
-#[event]
-pub struct AttestationMade {
-    /// The public key of the registry account
-    pub registry: Pubkey,
-    /// The attestor who made the attestation
-    pub attestor: Pubkey,
-    /// The task UUID that was attested
-    pub task_uuid: String,
-    /// The client who submitted the task
-    pub client: Pubkey,
-    /// Total attestations made by this attestor
-    pub total_attestations: u64,
-    /// Timestamp when attestation was made
-    pub timestamp: i64,
-}
 
