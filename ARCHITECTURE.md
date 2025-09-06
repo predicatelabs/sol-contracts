@@ -332,26 +332,3 @@ anchor deploy --provider.cluster mainnet
 6. **PDA Usage**: Deterministic account addresses
 7. **Type Safety**: Strong typing throughout the codebase
 8. **Gas Optimization**: Efficient account structures and operations
-
-## Integration with Ethereum
-
-This program is designed to work alongside Ethereum smart contracts:
-
-- **Compatible Structures**: Task and Attestation structures match Solidity versions
-- **Hash Compatibility**: Hashing functions produce compatible results
-- **Cross-chain Validation**: Attestations can be validated across chains
-
-## Future Enhancements
-
-Potential improvements for production use:
-
-1. **Batch Operations**: Multiple registrations/validations in one transaction
-2. **Rate Limiting**: Prevent spam transactions
-3. **Attestor Staking**: Economic security through staking mechanisms
-4. **Policy Templates**: Pre-defined policy templates for common use cases
-5. **Multi-signature**: Require multiple authorities for sensitive operations
-6. **Upgrade Authority**: Program upgrade management
-7. **Fee Structure**: Configurable fees for operations
-8. **Attestor Reputation**: Reputation system for attestors
-9. **Policy Versioning**: Version control for policy updates
-10. **Cross-chain Bridges**: Direct integration with Ethereum contracts
