@@ -84,14 +84,14 @@ pub fn validate_attestation(
         attestor: attestation.attestor,
         msg_value: task.msg_value,
         policy: String::from_utf8_lossy(task.get_policy()).to_string(),
-        uuid: hex::encode(task.uuid),
+        uuid: task.format_uuid(),
         expiration: task.expiration,
         timestamp: clock.unix_timestamp,
     });
 
     msg!(
         "Task {} validated by attestor {} for client {}",
-        hex::encode(attestation.uuid),
+        task.format_uuid(),
         attestation.attestor,
         task.msg_sender
     );

@@ -190,6 +190,18 @@ impl Task {
         &self.policy[..end]
     }
 
+    /// Format UUID with standard dashes (8-4-4-4-12 format)
+    pub fn format_uuid(&self) -> String {
+        let hex = hex::encode(self.uuid);
+        format!("{}-{}-{}-{}-{}", 
+            &hex[0..8], 
+            &hex[8..12], 
+            &hex[12..16], 
+            &hex[16..20], 
+            &hex[20..32]
+        )
+    }
+
     /// Hash the task for signature verification (equivalent to hashTaskSafe in Solidity)
     pub fn hash_task_safe(&self, validator: Pubkey) -> [u8; 32] {
         use anchor_lang::solana_program::hash::hash;
