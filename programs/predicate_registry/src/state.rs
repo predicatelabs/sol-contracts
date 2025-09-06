@@ -71,8 +71,8 @@ pub struct Task {
 /// Attestation structure matching the Solidity version
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Attestation {
-    /// Unique identifier matching the task
-    pub uuid: String,
+    /// Unique identifier matching the task (UUID as 16 bytes)
+    pub uuid: [u8; 16],
     /// The attestor's public key
     pub attestor: Pubkey,
     /// The signature from the attestor
