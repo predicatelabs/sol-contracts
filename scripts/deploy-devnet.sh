@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "🚀 Deploying Counter Program to Devnet"
-echo "======================================"
+echo "🚀 Deploying Predicate Registry Program to Devnet"
+echo "================================================="
 
 # Check if Solana CLI is installed
 if ! command -v solana &> /dev/null; then

@@ -105,7 +105,7 @@ pub mod predicate_registry {
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `policy` - The policy string (max 200 characters)
+    /// * `policy` - The policy data (max 200 bytes)
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -114,9 +114,9 @@ pub mod predicate_registry {
     /// * `PolicySet` - Emitted when policy is successfully set
     /// 
     /// # Errors
-    /// * `PolicyTooLong` - If policy string exceeds 200 characters
-    /// * `InvalidPolicy` - If policy string is empty
-    pub fn set_policy(ctx: Context<SetPolicy>, policy: String) -> Result<()> {
+    /// * `PolicyTooLong` - If policy data exceeds 200 bytes
+    /// * `InvalidPolicy` - If policy data is empty
+    pub fn set_policy(ctx: Context<SetPolicy>, policy: Vec<u8>) -> Result<()> {
         instructions::set_policy(ctx, policy)
     }
 
@@ -126,7 +126,7 @@ pub mod predicate_registry {
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `policy` - The new policy string (max 200 characters)
+    /// * `policy` - The new policy data (max 200 bytes)
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -135,10 +135,10 @@ pub mod predicate_registry {
     /// * `PolicyUpdated` - Emitted when policy is successfully updated
     /// 
     /// # Errors
-    /// * `PolicyTooLong` - If policy string exceeds 200 characters
-    /// * `InvalidPolicy` - If policy string is empty
+    /// * `PolicyTooLong` - If policy data exceeds 200 bytes
+    /// * `InvalidPolicy` - If policy data is empty
     /// * `PolicyNotFound` - If no existing policy found for client
-    pub fn update_policy(ctx: Context<UpdatePolicy>, policy: String) -> Result<()> {
+    pub fn update_policy(ctx: Context<UpdatePolicy>, policy: Vec<u8>) -> Result<()> {
         instructions::update_policy(ctx, policy)
     }
 
@@ -161,7 +161,6 @@ pub mod predicate_registry {
     /// 
     /// # Events
     /// * `TaskValidated` - Emitted when task is successfully validated
-    /// * `AttestationMade` - Emitted to track attestor activity
     /// 
     /// # Errors
     /// * `AttestorNotRegisteredForValidation` - If attestor is not registered

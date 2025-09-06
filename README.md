@@ -1,23 +1,23 @@
-# Solana Counter Program
+# Predicate Registry Program
 
-A production-ready counter program built with the Anchor framework for Solana. This program demonstrates advanced Solana development practices including modular architecture, comprehensive error handling, event emission, and robust security features.
+A comprehensive predicate registry program for managing attestors, policies, and task validation on Solana. This program provides a decentralized way to register attestors, set client policies, and validate tasks with cryptographic attestations.
 
 ## 🚀 Features
 
 ### Core Functionality
-- **Initialize**: Create a new counter account with PDA-based addressing
-- **Increment**: Increase the counter value by 1 with overflow protection
-- **Decrement**: Decrease the counter value by 1 with underflow protection
-- **Reset**: Reset counter to zero (authority only)
-- **Transfer Authority**: Transfer ownership to another account
+- **Registry Management**: Initialize and manage a decentralized predicate registry
+- **Attestor Registration**: Register and deregister trusted attestors
+- **Policy Management**: Set and update client validation policies
+- **Task Validation**: Validate tasks with cryptographic attestations
+- **Authority Management**: Secure ownership transfer capabilities
 
 ### Advanced Features
-- **Program Derived Addresses (PDAs)**: Deterministic account creation
+- **Program Derived Addresses (PDAs)**: Deterministic account creation for all entities
 - **Event Emission**: Observable state changes for off-chain applications
 - **Comprehensive Error Handling**: Custom error types with descriptive messages
 - **Authority Management**: Secure access control with ownership transfer
-- **Audit Trail**: Track creation time, updates, and operation counts
-- **Overflow/Underflow Protection**: Safe arithmetic operations
+- **Signature Verification**: Ed25519 signature validation for attestations
+- **Expiration Handling**: Time-based validation for tasks and attestations
 - **Modular Architecture**: Clean separation of concerns
 
 ## 📋 Prerequisites
@@ -99,64 +99,71 @@ anchor test -- --nocapture
 
 The program uses Program Derived Addresses (PDAs) for deterministic account creation:
 
-#### Initialize Counter
+#### Initialize Registry
 ```typescript
-const [counterPda] = PublicKey.findProgramAddressSync(
-  [Buffer.from("counter"), user.publicKey.toBuffer()],
+const [registryPda] = PublicKey.findProgramAddressSync(
+  [Buffer.from("predicate_registry")],
   program.programId
 );
 
 await program.methods
   .initialize()
   .accounts({
-    counter: counterPda,
-    user: user.publicKey,
+    registry: registryPda,
+    authority: authority.publicKey,
     systemProgram: SystemProgram.programId,
   })
   .rpc();
 ```
 
-#### Increment Counter
+#### Register Attestor
 ```typescript
+const [attestorPda] = PublicKey.findProgramAddressSync(
+  [Buffer.from("attestor"), attestorKey.toBuffer()],
+  program.programId
+);
+
 await program.methods
-  .increment()
+  .registerAttestor(attestorKey)
   .accounts({
-    counter: counterPda,
-    authority: user.publicKey,
+    registry: registryPda,
+    attestorAccount: attestorPda,
+    authority: authority.publicKey,
+    systemProgram: SystemProgram.programId,
   })
   .rpc();
 ```
 
-#### Decrement Counter
+#### Set Policy
 ```typescript
+const [policyPda] = PublicKey.findProgramAddressSync(
+  [Buffer.from("policy"), client.publicKey.toBuffer()],
+  program.programId
+);
+
+// Policy as byte array (max 200 bytes)
+const policyData = Buffer.from("your-policy-data", "utf8");
+
 await program.methods
-  .decrement()
+  .setPolicy(Array.from(policyData))
   .accounts({
-    counter: counterPda,
-    authority: user.publicKey,
+    registry: registryPda,
+    policyAccount: policyPda,
+    client: client.publicKey,
+    systemProgram: SystemProgram.programId,
   })
   .rpc();
 ```
 
-#### Reset Counter
+#### Validate Attestation
 ```typescript
 await program.methods
-  .reset()
+  .validateAttestation(task, attestorKey, attestation)
   .accounts({
-    counter: counterPda,
-    authority: user.publicKey,
-  })
-  .rpc();
-```
-
-#### Transfer Authority
-```typescript
-await program.methods
-  .transferAuthority(newAuthority.publicKey)
-  .accounts({
-    counter: counterPda,
-    authority: currentAuthority.publicKey,
-    newAuthority: newAuthority.publicKey,
+    registry: registryPda,
+    attestorAccount: attestorPda,
+    policyAccount: policyPda,
+    validator: validator.publicKey,
   })
   .rpc();
 ```
@@ -165,68 +172,122 @@ await program.methods
 
 ```
 sol-contracts/
-├── .github/workflows/       # CI/CD pipeline
-│   └── ci.yml
-├── programs/counter/        # Rust program source
+├── programs/predicate_registry/  # Rust program source
 │   ├── Cargo.toml
 │   └── src/
-│       ├── lib.rs          # Main program entry point
-│       ├── state.rs        # Account structures
-│       ├── errors.rs       # Custom error definitions
-│       ├── events.rs       # Event definitions
-│       └── instructions/   # Instruction handlers
-│           ├── mod.rs      # Module definitions
-│           ├── initialize.rs
-│           ├── update.rs
+│       ├── lib.rs               # Main program entry point
+│       ├── state.rs             # Account structures and state management
+│       ├── errors.rs            # Custom error definitions
+│       ├── events.rs            # Event definitions
+│       └── instructions/        # Instruction handlers
+│           ├── mod.rs           # Module definitions and contexts
+│           ├── initialize.rs    # Registry initialization
+│           ├── register_attestor.rs
+│           ├── deregister_attestor.rs
+│           ├── set_policy.rs
+│           ├── update_policy.rs
+│           ├── validate_attestation.rs
 │           └── transfer_authority.rs
-├── tests/                   # TypeScript tests
-│   └── counter.ts          # Comprehensive test suite
-├── migrations/              # Deployment scripts
+├── migrations/                  # Deployment scripts
 │   └── deploy.ts
-├── scripts/                 # Utility scripts
+├── scripts/                     # Utility scripts
 │   └── deploy-devnet.sh
-├── Anchor.toml             # Anchor configuration
-├── Cargo.toml              # Workspace configuration
-├── package.json            # Node.js dependencies
-├── tsconfig.json           # TypeScript configuration
-├── ARCHITECTURE.md         # Detailed architecture guide
-└── README.md               # This file
+├── Anchor.toml                  # Anchor configuration
+├── Cargo.toml                   # Workspace configuration
+├── package.json                 # Node.js dependencies
+├── tsconfig.json                # TypeScript configuration
+├── ARCHITECTURE.md              # Detailed architecture guide
+└── README.md                    # This file
 ```
 
 ## 🏗️ Program Architecture
 
-### Counter Account Structure
+### Registry Account Structure
 ```rust
-pub struct Counter {
-    pub authority: Pubkey,        // 32 bytes - Owner of the counter
-    pub count: u64,              // 8 bytes - Current count value
+pub struct PredicateRegistry {
+    pub authority: Pubkey,        // 32 bytes - Owner of the registry
     pub created_at: i64,         // 8 bytes - Creation timestamp
     pub updated_at: i64,         // 8 bytes - Last update timestamp
-    pub total_increments: u64,   // 8 bytes - Total increment operations
-    pub total_decrements: u64,   // 8 bytes - Total decrement operations
+    pub total_attestors: u64,    // 8 bytes - Total registered attestors
+    pub total_policies: u64,     // 8 bytes - Total policies set
+}
+```
+
+### Attestor Account Structure
+```rust
+pub struct AttestorAccount {
+    pub attestor: Pubkey,        // 32 bytes - Attestor's public key
+    pub is_registered: bool,     // 1 byte - Registration status
+    pub registered_at: i64,      // 8 bytes - Registration timestamp
+}
+```
+
+### Policy Account Structure
+```rust
+pub struct PolicyAccount {
+    pub client: Pubkey,          // 32 bytes - Client's public key
+    pub policy: [u8; 200],       // 200 bytes - Fixed-length policy data
+    pub policy_len: u16,         // 2 bytes - Actual length of policy data
+    pub set_at: i64,            // 8 bytes - Policy creation timestamp
+    pub updated_at: i64,        // 8 bytes - Last update timestamp
+}
+```
+
+### Task Structure
+```rust
+pub struct Task {
+    pub uuid: [u8; 16],                    // Unique identifier
+    pub msg_sender: Pubkey,                // Message sender
+    pub target: Pubkey,                    // Target address
+    pub msg_value: u64,                    // Message value (lamports)
+    pub encoded_sig_and_args: Vec<u8>,     // Encoded signature and arguments
+    pub policy: [u8; 200],                 // Fixed-length policy data
+    pub expiration: i64,                   // Expiration timestamp
+}
+```
+
+### Attestation Structure
+```rust
+pub struct Attestation {
+    pub uuid: [u8; 16],          // UUID matching the task
+    pub attestor: Pubkey,        // Attestor's public key
+    pub signature: [u8; 64],     // Ed25519 signature
+    pub expiration: i64,         // Expiration timestamp
 }
 ```
 
 ### Event Types
-- `CounterInitialized`: Emitted when a counter is created
-- `CounterIncremented`: Emitted when counter is incremented
-- `CounterDecremented`: Emitted when counter is decremented
-- `CounterReset`: Emitted when counter is reset
+- `RegistryInitialized`: Emitted when registry is created
+- `AttestorRegistered`: Emitted when attestor is registered
+- `AttestorDeregistered`: Emitted when attestor is deregistered
+- `PolicySet`: Emitted when policy is set
+- `PolicyUpdated`: Emitted when policy is updated
+- `TaskValidated`: Emitted when task validation succeeds
 - `AuthorityTransferred`: Emitted when ownership is transferred
 
 ### Error Types
-- `CounterOverflow`: Prevents arithmetic overflow
-- `CounterUnderflow`: Prevents decrementing below zero
+- `AttestorAlreadyRegistered`: Attestor is already registered
+- `AttestorNotRegistered`: Attestor is not registered
+- `AttestorNotRegisteredForValidation`: Attestor not registered for validation
+- `PolicyTooLong`: Policy string exceeds 200 characters
+- `InvalidPolicy`: Policy string is empty
+- `PolicyNotFound`: No existing policy found for client
+- `TaskExpired`: Task has expired
+- `AttestationExpired`: Attestation has expired
+- `InvalidSignature`: Attestation signature is invalid
+- `TaskIdMismatch`: Task and attestation UUIDs don't match
+- `ExpirationMismatch`: Task and attestation expirations don't match
+- `WrongAttestor`: Signature doesn't match provided attestor
 - `Unauthorized`: Access control violations
-- `InvalidParameter`: Invalid input validation
-- `AlreadyInitialized`: Duplicate initialization prevention
+- `ArithmeticError`: Arithmetic operation overflow/underflow
 
 ## 🛡️ Security Features
 
-- **Authority-based Access Control**: Only counter owner can modify
-- **Overflow/Underflow Protection**: Safe arithmetic operations
-- **Input Validation**: Parameter validation and sanitization
+- **Authority-based Access Control**: Registry operations require proper authorization
+- **Signature Verification**: Ed25519 signature validation for attestations
+- **Expiration Handling**: Time-based validation prevents stale data
 - **PDA-based Addressing**: Deterministic and secure account creation
+- **Input Validation**: Parameter validation and sanitization
 - **Event Auditing**: Complete operation history through events
 
 ## 📜 Available Scripts
@@ -283,22 +344,10 @@ anchor deploy --provider.cluster mainnet
 
 The program ID is declared in `lib.rs`:
 ```rust
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("PredicateRegistry11111111111111111111111111");
 ```
 
 **Important**: After deployment, update this with your actual program ID and update `Anchor.toml` accordingly.
-
-## 🔄 CI/CD Pipeline
-
-This project includes a comprehensive GitHub Actions pipeline:
-
-- **Lint & Format**: Code quality checks
-- **Build**: Program compilation
-- **Test**: Comprehensive test suite
-- **Security Audit**: Dependency vulnerability scanning
-- **Deploy**: Automated deployment to devnet/mainnet
-
-See `.github/workflows/ci.yml` for complete pipeline configuration.
 
 ## 📚 Documentation
 
@@ -335,4 +384,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Anchor Framework](https://www.anchor-lang.com/) for the excellent Solana development framework
 - [Solana Labs](https://solana.com/) for the high-performance blockchain platform
 - The Solana developer community for continuous support and resources
-ISC License

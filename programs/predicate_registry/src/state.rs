@@ -39,9 +39,10 @@ pub struct AttestorAccount {
 pub struct PolicyAccount {
     /// The client's public key
     pub client: Pubkey,
-    /// The policy string (limited to 200 characters for efficiency)
-    #[max_len(200)]
-    pub policy: String,
+    /// The policy data (fixed 200 bytes for efficiency)
+    pub policy: [u8; 200],
+    /// The actual length of the policy data
+    pub policy_len: u16,
     /// Timestamp when policy was set
     pub set_at: i64,
     /// Timestamp when policy was last updated
@@ -62,9 +63,8 @@ pub struct Task {
     pub msg_value: u64,
     /// Encoded signature and arguments
     pub encoded_sig_and_args: Vec<u8>,
-    /// The policy identifier (max 200 bytes)
-    #[max_len(200)]
-    pub policy: Vec<u8>,
+    /// The policy identifier (fixed 200 bytes)
+    pub policy: [u8; 200],
     /// Expiration timestamp
     pub expiration: i64,
 }
@@ -150,21 +150,34 @@ impl AttestorAccount {
 
 impl PolicyAccount {
     /// Initialize a new policy account
-    pub fn initialize(&mut self, client: Pubkey, policy: String, clock: &Clock) -> Result<()> {
+    pub fn initialize(&mut self, client: Pubkey, policy: &[u8], clock: &Clock) -> Result<()> {
         require!(policy.len() <= 200, crate::PredicateRegistryError::PolicyTooLong);
+        require!(!policy.is_empty(), crate::PredicateRegistryError::InvalidPolicy);
+        
         self.client = client;
-        self.policy = policy;
+        self.policy = [0u8; 200];
+        self.policy[..policy.len()].copy_from_slice(policy);
+        self.policy_len = policy.len() as u16;
         self.set_at = clock.unix_timestamp;
         self.updated_at = clock.unix_timestamp;
         Ok(())
     }
 
     /// Update the policy
-    pub fn update_policy(&mut self, policy: String, clock: &Clock) -> Result<()> {
+    pub fn update_policy(&mut self, policy: &[u8], clock: &Clock) -> Result<()> {
         require!(policy.len() <= 200, crate::PredicateRegistryError::PolicyTooLong);
-        self.policy = policy;
+        require!(!policy.is_empty(), crate::PredicateRegistryError::InvalidPolicy);
+        
+        self.policy = [0u8; 200];
+        self.policy[..policy.len()].copy_from_slice(policy);
+        self.policy_len = policy.len() as u16;
         self.updated_at = clock.unix_timestamp;
         Ok(())
+    }
+
+    /// Get the active policy as a slice
+    pub fn get_policy(&self) -> &[u8] {
+        &self.policy[..self.policy_len as usize]
     }
 }
 
@@ -175,12 +188,12 @@ impl Task {
         use anchor_lang::solana_program::hash::hash;
         
         let mut data = Vec::new();
-        data.extend_from_slice(self.uuid.as_bytes());
+        data.extend_from_slice(&self.uuid);
         data.extend_from_slice(&self.msg_sender.to_bytes());
         data.extend_from_slice(&validator.to_bytes()); // equivalent to msg.sender in Solidity
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(self.policy.as_bytes());
+        data.extend_from_slice(&self.policy);
         data.extend_from_slice(&self.expiration.to_le_bytes());
         
         hash(&data).to_bytes()
@@ -191,12 +204,12 @@ impl Task {
         use anchor_lang::solana_program::hash::hash;
         
         let mut data = Vec::new();
-        data.extend_from_slice(self.uuid.as_bytes());
+        data.extend_from_slice(&self.uuid);
         data.extend_from_slice(&self.msg_sender.to_bytes());
         data.extend_from_slice(&self.target.to_bytes());
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(self.policy.as_bytes());
+        data.extend_from_slice(&self.policy);
         data.extend_from_slice(&self.expiration.to_le_bytes());
         
         hash(&data).to_bytes()

@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use crate::instructions::ValidateAttestation;
 use crate::state::{Task, Attestation};
-use crate::events::{TaskValidated, AttestationMade};
+use crate::events::TaskValidated;
 use crate::errors::PredicateRegistryError;
 
 /// Validate an attestation for a task
@@ -70,6 +70,7 @@ pub fn validate_attestation(
         attestation.attestor == attestor_account.attestor,
         PredicateRegistryError::WrongAttestor
     );
+    
 
     // TODO: Implement proper Ed25519 signature verification
     // This would require additional dependencies and proper signature verification logic
@@ -82,15 +83,15 @@ pub fn validate_attestation(
         target: task.target,
         attestor: attestation.attestor,
         msg_value: task.msg_value,
-        policy: task.policy.clone(),
-        uuid: task.uuid.clone(),
+        policy: String::from_utf8_lossy(&task.policy).to_string(),
+        uuid: hex::encode(task.uuid),
         expiration: task.expiration,
         timestamp: clock.unix_timestamp,
     });
 
     msg!(
         "Task {} validated by attestor {} for client {}",
-        attestation.uuid,
+        hex::encode(attestation.uuid),
         attestation.attestor,
         task.msg_sender
     );
