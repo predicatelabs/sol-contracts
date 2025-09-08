@@ -181,6 +181,22 @@ export async function registerAttestor(
     .rpc();
 }
 
+export async function registerAttestorIfNotExists(
+  program: Program<PredicateRegistry>,
+  authority: Keypair,
+  attestor: PublicKey,
+  registryPda: PublicKey
+): Promise<string> {
+  try {
+    await program.account.attestorAccount.fetch(findAttestorPDA(attestor, program.programId)[0]);
+    console.log("Attestor already exists");
+    return "";
+  } catch (error) {
+    console.log("Attestor does not exist");
+  }
+  return await registerAttestor(program, authority, attestor, registryPda);
+}
+
 /**
  * Sets a policy for a client
  */

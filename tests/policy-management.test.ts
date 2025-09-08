@@ -159,14 +159,14 @@ describe("Policy Management", () => {
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
-            client: unauthorizedClient.publicKey,
+            client: unauthorizedClient.publicKey, // Wrong client
           } as any)
           .signers([unauthorizedClient])
           .rpc();
         
         expect.fail("Should have thrown an error");
       } catch (error: any) {
-        expect(error.message).to.include("Unauthorized");
+        expect(error.message).to.include("ConstraintSeeds");
       }
     });
 

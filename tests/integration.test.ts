@@ -6,6 +6,7 @@ import {
   findAttestorPDA,
   findPolicyPDA,
   registerAttestor,
+  registerAttestorIfNotExists,
   setPolicy
 } from "./helpers/test-utils";
 
@@ -75,7 +76,6 @@ describe("Integration Tests", () => {
       // 1. Initialize (already done by shared setup)
       let registryAccount = await context.program.account.predicateRegistry.fetch(context.registry.registryPda);
       const initialAttestors = registryAccount.totalAttestors.toNumber();
-      const initialPolicies = registryAccount.totalPolicies.toNumber();
 
       // 2. Register multiple attestors
       const attestors = [attestor1.publicKey, attestor2.publicKey];
@@ -134,7 +134,7 @@ describe("Integration Tests", () => {
 
     it("Should handle policy updates after attestor changes", async () => {
       // Register attestor and set policy
-      await registerAttestor(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
+      await registerAttestorIfNotExists(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
       await setPolicy(context.program, client1, Buffer.from("initial-policy"), context.registry.registryPda);
 
       // Deregister attestor
@@ -168,8 +168,8 @@ describe("Integration Tests", () => {
 
     it("Should maintain data consistency across authority transfers", async () => {
       // Set up initial state
-      await registerAttestor(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
-      await registerAttestor(context.program, context.authority.keypair, attestor2.publicKey, context.registry.registryPda);
+      await registerAttestorIfNotExists(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
+      await registerAttestorIfNotExists(context.program, context.authority.keypair, attestor2.publicKey, context.registry.registryPda);
       await setPolicy(context.program, client1, Buffer.from("test-policy"), context.registry.registryPda);
 
       const registryBefore = await context.program.account.predicateRegistry.fetch(context.registry.registryPda);
@@ -257,7 +257,7 @@ describe("Integration Tests", () => {
 
     it("Should handle errors gracefully during complex operations", async () => {
       // Register attestor
-      await registerAttestor(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
+      await registerAttestorIfNotExists(context.program, context.authority.keypair, attestor1.publicKey, context.registry.registryPda);
       
       const registryBefore = await context.program.account.predicateRegistry.fetch(context.registry.registryPda);
       const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
