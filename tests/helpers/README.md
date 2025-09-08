@@ -18,17 +18,17 @@ describe("Your Test Suite", () => {
     context = await setupSharedTestContext();
   });
 
-  it("should use shared accounts", async () => {
-    // Access shared accounts
-    const authority = context.accounts.authority;
-    const client1 = context.accounts.client1;
+  it("should use shared context", async () => {
+    // Access shared authority
+    const authority = context.authority.keypair;
     
     // Access shared program and provider
     const program = context.program;
     const provider = context.provider;
     
-    // Access shared PDAs
-    const registryPda = context.pdas.registryPda;
+    // Access shared registry PDA
+    const registryPda = context.registry.registryPda;
+    const registryBump = context.registry.registryBump;
   });
 });
 ```
@@ -40,34 +40,41 @@ describe("Your Test Suite", () => {
 3. **Reduced Complexity**: Eliminates duplicate setup code across test files
 4. **Better Resource Management**: Shared accounts reduce the number of SOL airdrops needed
 
-### Available Accounts
+### Available Context
 
-The shared context provides the following pre-funded accounts:
+The shared context provides:
 
-- `authority`: Main registry authority account
-- `newAuthority`: Alternative authority for transfer tests
-- `client1`, `client2`: Client accounts for policy tests
-- `attestor1`, `attestor2`: Attestor accounts for registration tests
-- `validator`: Validator account for general use
+- `context.authority`: Main registry authority account (persistent keypair)
+- `context.program`: Anchor program instance
+- `context.provider`: Anchor provider instance  
+- `context.registry`: Registry PDA and bump seed
+
+Additional test accounts can be created using helper functions:
+
+```typescript
+import { createTestAccount } from "./test-utils";
+
+// Create additional accounts as needed
+const client1Account = await createTestAccount(context.provider);
+const attestorKeypair = Keypair.generate();
+```
 
 ### Registry State
 
 The shared setup automatically:
 
-1. Creates and funds all test accounts
-2. Initializes the predicate registry with the authority account
+1. Creates and funds the persistent authority account
+2. Initializes the predicate registry with the authority account (if not already initialized)
 3. Provides access to the registry PDA and bump seed
+4. Ensures consistent state across all test files
 
-### Resetting Context
+### Persistent Authority
 
-If you need to reset the shared context (rare), you can call:
+The shared context uses a persistent authority keypair stored in `test-authority-keypair.json`. This ensures:
 
-```typescript
-import { resetSharedTestContext } from "./helpers/shared-setup";
-
-// This will force the next call to setupSharedTestContext to create fresh state
-resetSharedTestContext();
-```
+- Consistent registry ownership across test runs
+- Faster test execution (no need to re-initialize registry)
+- Reliable test isolation while sharing infrastructure
 
 ## Test Utils
 
