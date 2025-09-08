@@ -35,7 +35,7 @@ pub use errors::*;
 pub use events::*;
 
 // Program ID - This should be updated when you deploy
-declare_id!("PredicateRegistry11111111111111111111111111");
+declare_id!("Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK");
 
 /// Main program module containing all instruction handlers
 #[program]

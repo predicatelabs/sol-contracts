@@ -3,59 +3,44 @@ import { Program } from "@coral-xyz/anchor";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 
-export interface TestAccounts {
-  authority: Keypair;
-  newAuthority: Keypair;
-  client1: Keypair;
-  client2: Keypair;
-  attestor1: Keypair;
-  attestor2: Keypair;
-  validator: Keypair;
-}
-
-export interface TestPDAs {
+export interface TestRegistryPDA {
   registryPda: PublicKey;
   registryBump: number;
+}
+
+export interface TestAccount {
+  keypair: Keypair;
 }
 
 /**
  * Creates and funds test accounts with SOL
  */
-export async function createTestAccounts(provider: anchor.AnchorProvider): Promise<TestAccounts> {
-  const accounts: TestAccounts = {
-    authority: Keypair.generate(),
-    newAuthority: Keypair.generate(),
-    client1: Keypair.generate(),
-    client2: Keypair.generate(),
-    attestor1: Keypair.generate(),
-    attestor2: Keypair.generate(),
-    validator: Keypair.generate(),
+export async function createTestAccount(provider: anchor.AnchorProvider): Promise<TestAccount> {
+  const account: TestAccount = {
+    keypair: Keypair.generate(),
   };
 
   // Airdrop SOL to all accounts
-  const accountKeys = Object.values(accounts);
-  for (const account of accountKeys) {
-    await provider.connection.requestAirdrop(account.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-  }
+  await provider.connection.requestAirdrop(account.keypair.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
 
   // Wait for airdrops to confirm
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  return accounts;
+  return account;
 }
 
 /**
  * Finds program-derived addresses for the registry
  */
-export function findRegistryPDAs(programId: PublicKey): TestPDAs {
+export function findRegistryPDA(programId: PublicKey): TestRegistryPDA {
   const [registryPda, registryBump] = PublicKey.findProgramAddressSync(
     [Buffer.from("predicate_registry")],
     programId
   );
 
   return {
-    registryPda,
-    registryBump,
+    registryPda: registryPda,
+    registryBump: registryBump,
   };
 }
 
@@ -86,7 +71,12 @@ export async function initializeRegistry(
   program: Program<PredicateRegistry>,
   authority: Keypair,
   registryPda: PublicKey
-): Promise<string> {
+): Promise<anchor.web3.TransactionSignature> {
+  console.log("Initializing registry with authority:", authority.publicKey.toString());
+  console.log("Registry PDA:", registryPda.toString());
+  console.log("System Program:", SystemProgram.programId.toString());
+  console.log("Program ID:", program.programId.toString());
+
   return await program.methods
     .initialize()
     .accounts({
@@ -96,6 +86,24 @@ export async function initializeRegistry(
     } as any)
     .signers([authority])
     .rpc();
+}
+
+/**
+ * Initializes the predicate registry with the given authority if it does not exist
+ */
+export async function initializeRegistryIfNotExists(
+  program: Program<PredicateRegistry>,
+  authority: Keypair,
+  registryPda: PublicKey
+): Promise<anchor.web3.TransactionSignature> {
+  try {
+    await program.account.predicateRegistry.fetch(registryPda);
+    console.log("Registry already exists");
+    return "";
+  } catch (error) {
+    console.log("Registry does not exist");
+  }
+  return await initializeRegistry(program, authority, registryPda);
 }
 
 /**

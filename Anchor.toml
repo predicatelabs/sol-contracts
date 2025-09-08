@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-predicate_registry = "PredicateRegistry11111111111111111111111111"
+predicate_registry = "Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK"
 
 [programs.devnet]
-predicate_registry = "PredicateRegistry11111111111111111111111111"
+predicate_registry = "Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK"
 
 [programs.mainnet]
 predicate_registry = "PredicateRegistry11111111111111111111111111"
