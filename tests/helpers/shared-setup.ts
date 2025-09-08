@@ -3,6 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
 import { 
   createTestAccount, 
+  createTestAuthority,
   findRegistryPDA, 
   initializeRegistryIfNotExists,
   TestAccount,
@@ -34,8 +35,8 @@ export async function getSharedTestContext(): Promise<SharedTestContext> {
 
   const pda = findRegistryPDA(program.programId);
   
-  // Create test authority
-  const authority = await createTestAccount(provider);
+  // Create test authority using persistent keypair
+  const authority = await createTestAuthority(provider);
 
   // Initialize registry
   const tx = await initializeRegistryIfNotExists(program, authority.keypair, pda.registryPda);

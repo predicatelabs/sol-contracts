@@ -2,10 +2,16 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface TestRegistryPDA {
   registryPda: PublicKey;
   registryBump: number;
+}
+
+export interface TestAuthority {
+  keypair: Keypair;
 }
 
 export interface TestAccount {
@@ -13,7 +19,53 @@ export interface TestAccount {
 }
 
 /**
- * Creates and funds test accounts with SOL
+ * Path to the persistent test authority keypair
+ */
+const TEST_AUTHORITY_KEYPAIR_PATH = path.join(__dirname, 'test-authority-keypair.json');
+
+/**
+ * Loads the persistent test authority keypair from disk
+ */
+export function loadTestAuthorityKeypair(): Keypair {
+  try {
+    const keypairData = JSON.parse(fs.readFileSync(TEST_AUTHORITY_KEYPAIR_PATH, 'utf8'));
+    return Keypair.fromSecretKey(new Uint8Array(keypairData));
+  } catch (error) {
+    throw new Error(`Failed to load test authority keypair from ${TEST_AUTHORITY_KEYPAIR_PATH}: ${error}`);
+  }
+}
+
+/**
+ * Gets the public key of the persistent test authority without loading the full keypair
+ */
+export function getTestAuthorityPublicKey(): PublicKey {
+  return loadTestAuthorityKeypair().publicKey;
+}
+
+/**
+ * Creates a test authority using the persistent keypair and funds it with SOL
+ */
+export async function createTestAuthority(provider: anchor.AnchorProvider): Promise<TestAuthority> {
+  const keypair = loadTestAuthorityKeypair();
+  
+  // Check current balance
+  const balance = await provider.connection.getBalance(keypair.publicKey);
+  const minBalance = anchor.web3.LAMPORTS_PER_SOL; // 1 SOL minimum
+  
+  // Fund if balance is low
+  if (balance < minBalance) {
+    console.log(`Funding test authority ${keypair.publicKey.toString()} with SOL...`);
+    await provider.connection.requestAirdrop(keypair.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  return {
+    keypair: keypair,
+  };
+}
+
+/**
+ * Creates and funds test accounts with SOL (for non-authority accounts)
  */
 export async function createTestAccount(provider: anchor.AnchorProvider): Promise<TestAccount> {
   const account: TestAccount = {
