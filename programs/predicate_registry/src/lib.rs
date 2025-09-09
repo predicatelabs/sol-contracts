@@ -15,6 +15,11 @@
 //! - Signature verification ensures attestation authenticity
 //! - Expiration timestamps prevent stale attestations
 
+// Suppress warnings from Anchor's internal behavior
+// These are framework-level warnings, not from our code
+#![allow(deprecated)]
+#![allow(ambiguous_glob_reexports)]
+
 use anchor_lang::prelude::*;
 
 // Import our modules
@@ -30,7 +35,7 @@ pub use errors::*;
 pub use events::*;
 
 // Program ID - This should be updated when you deploy
-declare_id!("PredicateRegistry11111111111111111111111111");
+declare_id!("Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK");
 
 /// Main program module containing all instruction handlers
 #[program]

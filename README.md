@@ -18,7 +18,6 @@ A comprehensive predicate registry program for managing attestors, policies, and
 - **Authority Management**: Secure access control with ownership transfer
 - **Signature Verification**: Ed25519 signature validation for attestations
 - **Expiration Handling**: Time-based validation for tasks and attestations
-- **Modular Architecture**: Clean separation of concerns
 
 ## 📋 Prerequisites
 
@@ -32,7 +31,7 @@ A comprehensive predicate registry program for managing attestors, policies, and
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:predicatelabs/sol-contracts.git
    cd sol-contracts
    ```
 
@@ -315,7 +314,7 @@ solana-test-validator
 # Build and deploy
 anchor build
 anchor deploy
-anchor test
+anchor test --skip-deploy --skip-local-validator
 ```
 
 ### Devnet Deployment
