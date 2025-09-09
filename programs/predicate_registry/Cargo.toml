@@ -22,3 +22,4 @@ custom-panic = []
 [dependencies]
 anchor-lang = "0.31.1"
 hex = "0.4"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }

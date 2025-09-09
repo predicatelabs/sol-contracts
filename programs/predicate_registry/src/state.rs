@@ -50,6 +50,7 @@ pub struct PolicyAccount {
 }
 
 
+
 /// Task structure matching the Solidity version
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Task {
@@ -180,6 +181,7 @@ impl PolicyAccount {
         &self.policy[..self.policy_len as usize]
     }
 }
+
 
 
 impl Task {

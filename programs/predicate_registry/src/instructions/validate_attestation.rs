@@ -5,6 +5,7 @@ use crate::instructions::ValidateAttestation;
 use crate::state::{Task, Attestation};
 use crate::events::TaskValidated;
 use crate::errors::PredicateRegistryError;
+use ed25519_dalek::{Signature, VerifyingKey, Verifier};
 
 /// Validate an attestation for a task
 /// 
@@ -22,7 +23,8 @@ pub fn validate_attestation(
     _attestor_key: Pubkey,
     attestation: Attestation
 ) -> Result<bool> {
-    let registry = &mut ctx.accounts.registry;
+    let registry: &mut Account<'_, crate::PredicateRegistry> = &mut ctx.accounts.registry;
+
     let attestor_account = &mut ctx.accounts.attestor_account;
     let policy_account = &ctx.accounts.policy_account;
     let validator = &ctx.accounts.validator;
@@ -52,29 +54,45 @@ pub fn validate_attestation(
         PredicateRegistryError::TaskExpired
     );
 
-
     // Verify the policy matches
     require!(
         task.get_policy() == policy_account.get_policy(),
         PredicateRegistryError::InvalidPolicy
     );
 
-    // Hash the task for signature verification
-    let _message_hash = task.hash_task_safe(validator.key());
 
-    // Verify the signature using ed25519
-    // Note: In a real implementation, you would use the ed25519-dalek crate
-    // or Solana's built-in signature verification
-    // For now, we'll do a basic check that the attestor matches
+    // Verify that the attestor in the attestation matches the registered attestor
     require!(
         attestation.attestor == attestor_account.attestor,
         PredicateRegistryError::WrongAttestor
     );
-    
 
-    // TODO: Implement proper Ed25519 signature verification
-    // This would require additional dependencies and proper signature verification logic
-    // For now, we assume the signature is valid if the attestor matches
+    // Verify that the attestor is registered
+    require!(
+        attestor_account.is_registered,
+        PredicateRegistryError::AttestorNotRegisteredForValidation
+    );
+
+
+    // Hash the task for signature verification
+    let message_hash = task.hash_task_safe(validator.key());
+
+    // Verify Ed25519 signature
+    let signature = match Signature::try_from(&attestation.signature[..]) {
+        Ok(sig) => sig,
+        Err(_) => return Err(PredicateRegistryError::InvalidSignature.into()),
+    };
+    
+    let verifying_key = match VerifyingKey::try_from(&attestation.attestor.to_bytes()[..]) {
+        Ok(key) => key,
+        Err(_) => return Err(PredicateRegistryError::InvalidSignature.into()),
+    };
+    
+    // Verify the signature against the message hash
+    match verifying_key.verify(&message_hash, &signature) {
+        Ok(_) => {},
+        Err(_) => return Err(PredicateRegistryError::InvalidSignature.into()),
+    };
 
     // Emit events
     emit!(TaskValidated {
