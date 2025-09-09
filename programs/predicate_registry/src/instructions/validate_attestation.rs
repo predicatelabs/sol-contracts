@@ -50,26 +50,6 @@ pub fn validate_attestation(
 
     // === INPUT VALIDATION ===
     
-    // Validate UUID format (16 bytes, non-zero)
-    require!(
-        task.uuid != [0u8; 16] && attestation.uuid != [0u8; 16],
-        PredicateRegistryError::InvalidParameter
-    );
-
-    // Validate expiration timestamps (must be positive and reasonable)
-    require!(
-        task.expiration > 0 && attestation.expiration > 0,
-        PredicateRegistryError::InvalidParameter
-    );
-
-    // Validate that expiration is not too far in the future (prevent overflow attacks)
-    const MAX_EXPIRATION_OFFSET: i64 = 365 * 24 * 60 * 60; // 1 year
-    require!(
-        task.expiration <= current_timestamp + MAX_EXPIRATION_OFFSET &&
-        attestation.expiration <= current_timestamp + MAX_EXPIRATION_OFFSET,
-        PredicateRegistryError::InvalidParameter
-    );
-
     // Validate signature length
     require!(
         attestation.signature.len() == 64,
