@@ -21,17 +21,24 @@ export interface TestAccount {
 /**
  * Path to the persistent test authority keypair
  */
-const TEST_AUTHORITY_KEYPAIR_PATH = path.join(__dirname, 'test-authority-keypair.json');
+const TEST_AUTHORITY_KEYPAIR_PATH = path.join(
+  __dirname,
+  "test-authority-keypair.json"
+);
 
 /**
  * Loads the persistent test authority keypair from disk
  */
 export function loadTestAuthorityKeypair(): Keypair {
   try {
-    const keypairData = JSON.parse(fs.readFileSync(TEST_AUTHORITY_KEYPAIR_PATH, 'utf8'));
+    const keypairData = JSON.parse(
+      fs.readFileSync(TEST_AUTHORITY_KEYPAIR_PATH, "utf8")
+    );
     return Keypair.fromSecretKey(new Uint8Array(keypairData));
   } catch (error) {
-    throw new Error(`Failed to load test authority keypair from ${TEST_AUTHORITY_KEYPAIR_PATH}: ${error}`);
+    throw new Error(
+      `Failed to load test authority keypair from ${TEST_AUTHORITY_KEYPAIR_PATH}: ${error}`
+    );
   }
 }
 
@@ -45,18 +52,25 @@ export function getTestAuthorityPublicKey(): PublicKey {
 /**
  * Creates a test authority using the persistent keypair and funds it with SOL
  */
-export async function createTestAuthority(provider: anchor.AnchorProvider): Promise<TestAuthority> {
+export async function createTestAuthority(
+  provider: anchor.AnchorProvider
+): Promise<TestAuthority> {
   const keypair = loadTestAuthorityKeypair();
-  
+
   // Check current balance
   const balance = await provider.connection.getBalance(keypair.publicKey);
   const minBalance = anchor.web3.LAMPORTS_PER_SOL; // 1 SOL minimum
-  
+
   // Fund if balance is low
   if (balance < minBalance) {
-    console.log(`Funding test authority ${keypair.publicKey.toString()} with SOL...`);
-    await provider.connection.requestAirdrop(keypair.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(
+      `Funding test authority ${keypair.publicKey.toString()} with SOL...`
+    );
+    await provider.connection.requestAirdrop(
+      keypair.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   return {
@@ -67,16 +81,21 @@ export async function createTestAuthority(provider: anchor.AnchorProvider): Prom
 /**
  * Creates and funds test accounts with SOL (for non-authority accounts)
  */
-export async function createTestAccount(provider: anchor.AnchorProvider): Promise<TestAccount> {
+export async function createTestAccount(
+  provider: anchor.AnchorProvider
+): Promise<TestAccount> {
   const account: TestAccount = {
     keypair: Keypair.generate(),
   };
 
   // Airdrop SOL to all accounts
-  await provider.connection.requestAirdrop(account.keypair.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+  await provider.connection.requestAirdrop(
+    account.keypair.publicKey,
+    2 * anchor.web3.LAMPORTS_PER_SOL
+  );
 
   // Wait for airdrops to confirm
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   return account;
 }
@@ -99,7 +118,10 @@ export function findRegistryPDA(programId: PublicKey): TestRegistryPDA {
 /**
  * Finds attestor PDA for a given attestor public key
  */
-export function findAttestorPDA(attestor: PublicKey, programId: PublicKey): [PublicKey, number] {
+export function findAttestorPDA(
+  attestor: PublicKey,
+  programId: PublicKey
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("attestor"), attestor.toBuffer()],
     programId
@@ -109,7 +131,10 @@ export function findAttestorPDA(attestor: PublicKey, programId: PublicKey): [Pub
 /**
  * Finds policy PDA for a given client public key
  */
-export function findPolicyPDA(client: PublicKey, programId: PublicKey): [PublicKey, number] {
+export function findPolicyPDA(
+  client: PublicKey,
+  programId: PublicKey
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("policy"), client.toBuffer()],
     programId
@@ -124,7 +149,10 @@ export async function initializeRegistry(
   authority: Keypair,
   registryPda: PublicKey
 ): Promise<anchor.web3.TransactionSignature> {
-  console.log("Initializing registry with authority:", authority.publicKey.toString());
+  console.log(
+    "Initializing registry with authority:",
+    authority.publicKey.toString()
+  );
   console.log("Registry PDA:", registryPda.toString());
   console.log("System Program:", SystemProgram.programId.toString());
   console.log("Program ID:", program.programId.toString());
@@ -188,7 +216,9 @@ export async function registerAttestorIfNotExists(
   registryPda: PublicKey
 ): Promise<string> {
   try {
-    await program.account.attestorAccount.fetch(findAttestorPDA(attestor, program.programId)[0]);
+    await program.account.attestorAccount.fetch(
+      findAttestorPDA(attestor, program.programId)[0]
+    );
     console.log("Attestor already exists");
     return "";
   } catch (error) {
@@ -290,14 +320,18 @@ export function createTestAttestation(
  * Generates a random UUID as 16 bytes
  */
 export function generateUUID(): Buffer {
-  return Buffer.from(Array.from({ length: 16 }, () => Math.floor(Math.random() * 256)));
+  return Buffer.from(
+    Array.from({ length: 16 }, () => Math.floor(Math.random() * 256))
+  );
 }
 
 /**
  * Generates a random signature as 64 bytes (for testing purposes only)
  */
 export function generateTestSignature(): Buffer {
-  return Buffer.from(Array.from({ length: 64 }, () => Math.floor(Math.random() * 256)));
+  return Buffer.from(
+    Array.from({ length: 64 }, () => Math.floor(Math.random() * 256))
+  );
 }
 
 /**
@@ -325,7 +359,7 @@ export function getPastTimestamp(secondsAgo: number): number {
  * Waits for a specified number of milliseconds
  */
 export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -333,20 +367,29 @@ export function sleep(ms: number): Promise<void> {
  */
 export function expectError(error: any, expectedMessage: string): void {
   if (!error || !error.message) {
-    throw new Error(`Expected error with message containing "${expectedMessage}", but no error was thrown`);
+    throw new Error(
+      `Expected error with message containing "${expectedMessage}", but no error was thrown`
+    );
   }
-  
+
   if (!error.message.includes(expectedMessage)) {
-    throw new Error(`Expected error message to contain "${expectedMessage}", but got: ${error.message}`);
+    throw new Error(
+      `Expected error message to contain "${expectedMessage}", but got: ${error.message}`
+    );
   }
 }
 
 /**
  * Creates a funded keypair for testing
  */
-export async function createFundedKeypair(provider: anchor.AnchorProvider): Promise<Keypair> {
+export async function createFundedKeypair(
+  provider: anchor.AnchorProvider
+): Promise<Keypair> {
   const keypair = Keypair.generate();
-  await provider.connection.requestAirdrop(keypair.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+  await provider.connection.requestAirdrop(
+    keypair.publicKey,
+    anchor.web3.LAMPORTS_PER_SOL
+  );
   await sleep(500);
   return keypair;
 }

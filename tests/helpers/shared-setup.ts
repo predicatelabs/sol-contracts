@@ -1,10 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
-import { 
-  createTestAccount, 
+import {
+  createTestAccount,
   createTestAuthority,
-  findRegistryPDA, 
+  findRegistryPDA,
   initializeRegistryIfNotExists,
   TestAccount,
   TestRegistryPDA,
@@ -30,16 +30,21 @@ export async function getSharedTestContext(): Promise<SharedTestContext> {
 
   // Set up provider and program
   anchor.setProvider(anchor.AnchorProvider.env());
-  const program = anchor.workspace.PredicateRegistry as Program<PredicateRegistry>;
+  const program = anchor.workspace
+    .PredicateRegistry as Program<PredicateRegistry>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const pda = findRegistryPDA(program.programId);
-  
+
   // Create test authority using persistent keypair
   const authority = await createTestAuthority(provider);
 
   // Initialize registry
-  const tx = await initializeRegistryIfNotExists(program, authority.keypair, pda.registryPda);
+  const tx = await initializeRegistryIfNotExists(
+    program,
+    authority.keypair,
+    pda.registryPda
+  );
   console.log("Registry initialized with tx:", tx);
 
   sharedContext = {
