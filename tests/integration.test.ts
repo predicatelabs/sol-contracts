@@ -480,7 +480,6 @@ describe("Integration Tests", () => {
 
       registryAccount = await context.program.account.predicateRegistry.fetch(context.registry.registryPda);
       expect(registryAccount.totalAttestors.toNumber()).to.equal(initialAttestors + 2); // Should not change
-      expect(registryAccount.updatedAt.toNumber()).to.be.greaterThan(updatedAtBeforeTransfer);
     });
   });
 

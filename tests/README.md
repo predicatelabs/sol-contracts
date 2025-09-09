@@ -9,7 +9,6 @@ The test suite follows a **focused unit tests + comprehensive integration tests*
 - **Focused Test Files**: Each core instruction has its own dedicated test file with thorough unit testing
 - **Integration Test File**: Complex workflows, cross-operation scenarios, edge cases, and end-to-end testing
 - **Shared Context**: All tests use a shared test context for consistency and performance
-- **No Redundancy**: Eliminated duplicate test cases through strategic consolidation
 
 ## Test Structure
 
