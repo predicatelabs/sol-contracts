@@ -812,7 +812,7 @@ describe("Integration Tests", () => {
         context.program.programId
       );
 
-      const maxPolicy = new Array(200).fill(65); // Exactly 200 'A' characters
+      const maxPolicy = Buffer.alloc(200, 'A'); // Exactly 200 'A' characters
 
       await context.program.methods
         .setPolicy(Buffer.from(maxPolicy))
