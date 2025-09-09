@@ -221,6 +221,28 @@ export async function setPolicy(
 }
 
 /**
+ * Updates a policy for a client
+ */
+export async function updatePolicy(
+  program: Program<PredicateRegistry>,
+  client: Keypair,
+  policy: Buffer,
+  registryPda: PublicKey
+): Promise<string> {
+  const [policyPda] = findPolicyPDA(client.publicKey, program.programId);
+
+  return await program.methods
+    .updatePolicy(policy)
+    .accounts({
+      registry: registryPda,
+      policyAccount: policyPda,
+      client: client.publicKey,
+    } as any)
+    .signers([client])
+    .rpc();
+}
+
+/**
  * Creates a test task structure
  */
 export function createTestTask(

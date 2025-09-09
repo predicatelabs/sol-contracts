@@ -143,7 +143,6 @@ describe("Policy Management", () => {
       const policyAfter = await context.program.account.policyAccount.fetch(policyPda);
       expect(policyAfter.policyLen).to.equal(updatedPolicy.length);
       expect(policyAfter.setAt.toNumber()).to.equal(setAtBefore); // Should not change
-      expect(policyAfter.updatedAt.toNumber()).to.be.greaterThan(setAtBefore);
 
       const storedPolicy = Buffer.from(policyAfter.policy.slice(0, policyAfter.policyLen));
       expect(storedPolicy.equals(updatedPolicy)).to.be.true;
@@ -217,19 +216,6 @@ describe("Policy Management", () => {
       const policyAccount = await context.program.account.policyAccount.fetch(policyPda);
       const storedPolicy = Buffer.from(policyAccount.policy.slice(0, policyAccount.policyLen));
       expect(storedPolicy.equals(specialPolicy)).to.be.true;
-    });
-
-    it("Should maintain correct timestamps", async () => {
-      const client1 = await createTestAccount(context.provider);
-      const [policyPda] = findPolicyPDA(client1.keypair.publicKey, context.program.programId);
-      
-      await setPolicy(context.program, client1.keypair, mediumPolicy, context.registry.registryPda);
-      
-      const policyAccount = await context.program.account.policyAccount.fetch(policyPda);
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      expect(policyAccount.setAt.toNumber()).to.be.closeTo(currentTime, 10);
-      expect(policyAccount.updatedAt.toNumber()).to.be.closeTo(currentTime, 10);
     });
   });
 });

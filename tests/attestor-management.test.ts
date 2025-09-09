@@ -388,12 +388,14 @@ describe("Attestor Management", () => {
       const attestor1 = await createTestAccount(context.provider);
       const [attestorPda] = findAttestorPDA(attestor1.keypair.publicKey, context.program.programId);
       
+      const beforeTime = Math.floor(Date.now() / 1000);
       await registerAttestor(context.program, context.authority.keypair, attestor1.keypair.publicKey, context.registry.registryPda);
+      const afterTime = Math.floor(Date.now() / 1000);
       
       const attestorAccount = await context.program.account.attestorAccount.fetch(attestorPda);
-      const currentTime = Math.floor(Date.now() / 1000);
       
-      expect(attestorAccount.registeredAt.toNumber()).to.be.closeTo(currentTime, 10);
+      expect(attestorAccount.registeredAt.toNumber()).to.be.at.least(beforeTime);
+      expect(attestorAccount.registeredAt.toNumber()).to.be.at.most(afterTime);
     });
   });
 });
