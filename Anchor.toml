@@ -4,11 +4,9 @@ skip-lint = false
 
 [programs.localnet]
 predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
-spl_token_predicate = "SptPRED1cateExamp1e111111111111111111111111"
 
 [programs.devnet]
 predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
-spl_token_predicate = "SptPRED1cateExamp1e111111111111111111111111"
 
 [programs.mainnet]
 predicate_registry = "PredicateRegistry11111111111111111111111111"

@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    "programs/predicate_registry",
-    "programs/spl_token_predicate"
+    "programs/predicate_registry"
 ]
 resolver = "2"
 
