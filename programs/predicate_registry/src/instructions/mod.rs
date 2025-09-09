@@ -184,6 +184,11 @@ pub struct ValidateAttestation<'info> {
     
     /// The validator calling this instruction
     pub validator: Signer<'info>,
+    
+    /// Instructions sysvar for signature verification
+    /// CHECK: This is the instructions sysvar account
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
 }
 
 /// Account validation context for transferring authority

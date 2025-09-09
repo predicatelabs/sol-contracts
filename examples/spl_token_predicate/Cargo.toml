@@ -1,0 +1,27 @@
+[package]
+name = "spl_token_predicate"
+version = "0.1.0"
+description = "Example program demonstrating SPL Token integration with Predicate Registry"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "spl_token_predicate"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = "0.31.1"
+spl-token = "8.0.0"
+predicate_registry = { path = "../../programs/predicate_registry", features = ["cpi"] }
+
+[dev-dependencies]
+solana-program-test = "3.0.1"
+solana-sdk = "3.0.0"
+tokio = "1.0"

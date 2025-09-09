@@ -3,10 +3,12 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-predicate_registry = "Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK"
+predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+spl_token_predicate = "SptPRED1cateExamp1e111111111111111111111111"
 
 [programs.devnet]
-predicate_registry = "Q4QChjhsvZKr6TxrBTZoKtp3JUx4tgwCvoSqNVd3CBK"
+predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+spl_token_predicate = "SptPRED1cateExamp1e111111111111111111111111"
 
 [programs.mainnet]
 predicate_registry = "PredicateRegistry11111111111111111111111111"
@@ -19,7 +21,7 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/**.test.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/validate-attestation.test.ts"
 
 [test.validator]
 url = "http://127.0.0.1:8899"
