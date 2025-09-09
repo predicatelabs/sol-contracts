@@ -314,7 +314,7 @@ solana-test-validator
 # Build and deploy
 anchor build
 anchor deploy
-anchor test
+anchor test --skip-deploy --skip-local-validator
 ```
 
 ### Devnet Deployment
