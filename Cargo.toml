@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "programs/predicate_registry"
+    "programs/predicate_registry",
+    "programs/counter"
 ]
 resolver = "2"
 

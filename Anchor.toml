@@ -4,12 +4,15 @@ skip-lint = false
 
 [programs.localnet]
 predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+counter = "Counter111111111111111111111111111111111111"
 
 [programs.devnet]
 predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+counter = "Counter111111111111111111111111111111111111"
 
 [programs.mainnet]
 predicate_registry = "PredicateRegistry11111111111111111111111111"
+counter = "Counter111111111111111111111111111111111111"
 
 [registry]
 url = "http://127.0.0.1:8899"
