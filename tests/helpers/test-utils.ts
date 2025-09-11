@@ -66,11 +66,13 @@ export async function createTestAuthority(
     console.log(
       `Funding test authority ${keypair.publicKey.toString()} with SOL...`
     );
-    await provider.connection.requestAirdrop(
+    const signature = await provider.connection.requestAirdrop(
       keypair.publicKey,
       2 * anchor.web3.LAMPORTS_PER_SOL
     );
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Wait for airdrop to confirm
+    await provider.connection.confirmTransaction(signature);
+    console.log(`Airdrop confirmed with signature: ${signature}`);
   }
 
   return {
@@ -89,13 +91,13 @@ export async function createTestAccount(
   };
 
   // Airdrop SOL to all accounts
-  await provider.connection.requestAirdrop(
+  const signature = await provider.connection.requestAirdrop(
     account.keypair.publicKey,
     2 * anchor.web3.LAMPORTS_PER_SOL
   );
 
   // Wait for airdrops to confirm
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await provider.connection.confirmTransaction(signature);
 
   return account;
 }
@@ -393,3 +395,37 @@ export async function createFundedKeypair(
   await sleep(500);
   return keypair;
 }
+
+/**
+ * Wrapper for findRegistryPDA to match expected interface
+ */
+export function getRegistryPDA(programId: PublicKey) {
+  const result = findRegistryPDA(programId);
+  return {
+    registryPda: result.registryPda,
+    registryBump: result.registryBump,
+  };
+}
+
+/**
+ * Wrapper for findAttestorPDA to match expected interface
+ */
+export function getAttestorPDA(programId: PublicKey, attestor: PublicKey) {
+  const [attestorPda, attestorBump] = findAttestorPDA(attestor, programId);
+  return {
+    attestorPda,
+    attestorBump,
+  };
+}
+
+/**
+ * Wrapper for findPolicyPDA to match expected interface
+ */
+export function getPolicyPDA(programId: PublicKey, client: PublicKey) {
+  const [policyPda, policyBump] = findPolicyPDA(client, programId);
+  return {
+    policyPda,
+    policyBump,
+  };
+}
+

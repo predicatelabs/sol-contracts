@@ -510,7 +510,7 @@ describe("Authority Transfer", () => {
 
       for (const nextAuthority of authorities) {
         // Wait to ensure timestamp difference
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         await context.program.methods
           .transferAuthority(nextAuthority.publicKey)

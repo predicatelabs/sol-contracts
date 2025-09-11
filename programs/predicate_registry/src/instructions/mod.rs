@@ -158,7 +158,7 @@ pub struct UpdatePolicy<'info> {
 /// Account validation context for validating an attestation
 #[derive(Accounts)]
 #[instruction(task: Task, attestor_key: Pubkey)]
-pub struct ValidateAttestation<'info> {
+pub struct ValidateAttestation<'info> {    
     /// The registry account
     #[account(
         mut,
@@ -166,7 +166,6 @@ pub struct ValidateAttestation<'info> {
         bump
     )]
     pub registry: Account<'info, PredicateRegistry>,
-    
     /// The attestor account that made the attestation
     #[account(
         mut,
@@ -183,8 +182,13 @@ pub struct ValidateAttestation<'info> {
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
-    /// The validator calling this instruction (no longer needs to be mut since no account creation)
+    /// The validator calling this instruction
     pub validator: Signer<'info>,
+    
+    /// Instructions sysvar for signature verification
+    /// CHECK: This is the instructions sysvar account
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
 }
 
 /// Account validation context for transferring authority
