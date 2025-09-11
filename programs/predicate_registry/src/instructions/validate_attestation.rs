@@ -230,34 +230,68 @@ fn verify_ed25519_signature(
     // We'll verify by checking if the signature verification would pass
     // by extracting the components from the standard format
     
-    // Extract signature (64 bytes starting after the header)
-    let sig_start = 16; // Signature typically starts after header
+    // Parse Ed25519 instruction format according to Solana's specification
+    // Reference: https://docs.solana.com/developing/runtime-facilities/programs#ed25519-program
+    // Format:
+    // [0]   u8: num_signatures
+    // [1]   u8: padding
+    // [2..4] u16: signature_offset
+    // [4..6] u16: signature_instruction_index
+    // [6..8] u16: public_key_offset
+    // [8..10] u16: public_key_instruction_index
+    // [10..12] u16: message_data_offset
+    // [12..14] u16: message_data_size
+    // [14..16] u16: message_instruction_index
+    // [16..] signature, pubkey, message
+
     require!(
-        ix_data.len() >= sig_start + 64,
-        PredicateRegistryError::InvalidSignature
-    );
-    
-    // For now, let's just verify that the instruction contains our expected signature
-    // The exact parsing depends on the standard format which may vary
-    let contains_signature = ix_data.windows(64).any(|window| window == signature);
-    let contains_pubkey = ix_data.windows(32).any(|window| window == pubkey);
-    let contains_message = ix_data.windows(message.len()).any(|window| window == message);
-    
-    require!(
-        contains_signature,
-        PredicateRegistryError::InvalidSignature
-    );
-    
-    require!(
-        contains_pubkey,
-        PredicateRegistryError::InvalidSignature
-    );
-    
-    require!(
-        contains_message,
+        ix_data.len() >= 16,
         PredicateRegistryError::InvalidSignature
     );
 
+    // Only support single signature for now
+    let num_signatures = ix_data[0];
+    require!(
+        num_signatures == 1,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Offsets are little-endian u16
+    let sig_offset = u16::from_le_bytes([ix_data[2], ix_data[3]]) as usize;
+    let pubkey_offset = u16::from_le_bytes([ix_data[6], ix_data[7]]) as usize;
+    let msg_offset = u16::from_le_bytes([ix_data[10], ix_data[11]]) as usize;
+    let msg_size = u16::from_le_bytes([ix_data[12], ix_data[13]]) as usize;
+
+    // Check bounds
+    require!(
+        ix_data.len() >= sig_offset + 64,
+        PredicateRegistryError::InvalidSignature
+    );
+    require!(
+        ix_data.len() >= pubkey_offset + 32,
+        PredicateRegistryError::InvalidSignature
+    );
+    require!(
+        ix_data.len() >= msg_offset + msg_size,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    let sig_slice = &ix_data[sig_offset..sig_offset + 64];
+    let pubkey_slice = &ix_data[pubkey_offset..pubkey_offset + 32];
+    let msg_slice = &ix_data[msg_offset..msg_offset + msg_size];
+
+    require!(
+        sig_slice == signature,
+        PredicateRegistryError::InvalidSignature
+    );
+    require!(
+        pubkey_slice == pubkey,
+        PredicateRegistryError::InvalidSignature
+    );
+    require!(
+        msg_slice == message,
+        PredicateRegistryError::InvalidSignature
+    );
     // If we reach here, the signature verification instruction was properly included
     // and matches our expected parameters
     Ok(())
