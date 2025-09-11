@@ -102,7 +102,7 @@ fn validate_attestation_cpi(
         registry: ctx.accounts.predicate_registry.to_account_info(),
         attestor_account: ctx.accounts.attestor_account.to_account_info(),
         policy_account: ctx.accounts.policy_account.to_account_info(),
-        validator: ctx.accounts.counter.to_account_info(),
+        validator: ctx.accounts.owner.to_account_info(),
         instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
     };
 
@@ -132,9 +132,13 @@ pub struct Increment<'info> {
         mut,
         seeds = [b"counter", counter.owner.as_ref()],
         bump,
-        has_one = predicate_registry
+        has_one = predicate_registry,
+        has_one = owner
     )]
     pub counter: Account<'info, CounterAccount>,
+
+    /// The owner of the counter who is calling increment
+    pub owner: Signer<'info>,
 
     /// The predicate registry account
     #[account(mut)]

@@ -242,7 +242,7 @@ function createIncrementTask(owner: PublicKey, counterProgram: Program<Counter>)
     msgSender: owner,
     target: counterProgram.programId,
     msgValue: new anchor.BN(0), // No SOL value for increment
-    encodedSigAndArgs: Array.from(encodedSigAndArgs),
+    encodedSigAndArgs: encodedSigAndArgs,
     policy: Array.from(policyBuffer),
     expiration: new anchor.BN(expiration),
   };
@@ -319,8 +319,8 @@ async function incrementCounter(
   // Create task for increment operation
   const task = createIncrementTask(owner.publicKey, counterProgram);
   
-  // Create signature - use counter PDA as validator (acts as the validator in this context)
-  const signature = createSignature(task, attestor, pdas.counterPda);
+  // Create signature - use owner as validator (the one calling increment)
+  const signature = createSignature(task, attestor, owner.publicKey);
   
   // Create attestation
   const attestation = createAttestation(
@@ -331,7 +331,7 @@ async function incrementCounter(
   );
 
   // Create message hash for Ed25519 verification instruction
-  const messageHash = createMessageHash(task, pdas.counterPda);
+  const messageHash = createMessageHash(task, owner.publicKey);
 
   // Create Ed25519 verification instruction
   const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -345,6 +345,7 @@ async function incrementCounter(
     .increment(task, attestor.publicKey, attestation)
     .accounts({
       counter: pdas.counterPda,
+      owner: owner.publicKey,
       predicateRegistry: pdas.registryPda,
       attestorAccount: pdas.attestorPda,
       policyAccount: pdas.policyPda,
