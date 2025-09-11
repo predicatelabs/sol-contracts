@@ -38,7 +38,7 @@ pub use events::*;
 pub use errors::*;
 
 // Program ID
-declare_id!("Counter111111111111111111111111111111111111");
+declare_id!("8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ");
 
 /// Main program module containing all instruction handlers
 #[program]
