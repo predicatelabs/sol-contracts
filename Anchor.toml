@@ -3,13 +3,16 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+predicate_registry = "gg929D9WoMes8gSQUuoYTL31TvTy4bXCZB2ruQdizNv"
+counter = "8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ"
 
 [programs.devnet]
-predicate_registry = "GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx"
+predicate_registry = "gg929D9WoMes8gSQUuoYTL31TvTy4bXCZB2ruQdizNv"
+counter = "8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ"
 
 [programs.mainnet]
-predicate_registry = "PredicateRegistry11111111111111111111111111"
+predicate_registry = "gg929D9WoMes8gSQUuoYTL31TvTy4bXCZB2ruQdizNv"
+counter = "8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ"
 
 [registry]
 url = "http://127.0.0.1:8899"

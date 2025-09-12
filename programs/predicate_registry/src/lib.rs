@@ -36,7 +36,7 @@ pub use errors::*;
 pub use events::*;
 
 // Program ID - This should be updated when you deploy
-declare_id!("GNhUnSDSxfpFqHV73TPNGFCmfgrxuLLL6jcE1zXe9xx");
+declare_id!("gg929D9WoMes8gSQUuoYTL31TvTy4bXCZB2ruQdizNv");
 
 /// Main program module containing all instruction handlers
 #[program]

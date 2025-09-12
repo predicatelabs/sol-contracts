@@ -1,0 +1,106 @@
+//! # Counter Program
+//! 
+//! A simple counter program integrated with predicate-registry that demonstrates
+//! how to protect program instructions with predicate validation.
+//!
+//! ## Features
+//! - Counter initialization with predicate-registry integration
+//! - Protected increment function requiring valid attestation
+//! - Cross-program invocation (CPI) to predicate-registry for validation
+//!
+//! ## Integration Pattern
+//! This program follows the inheritance pattern from Solidity examples,
+//! where business logic is directly protected by predicate validation.
+//!
+//! ## Module Structure
+//! - `instructions`: All instruction handlers (initialize, increment, get_value)
+//! - `state`: Account structures and state management
+//! - `events`: Event definitions for program transparency
+//! - `errors`: Custom error codes for specific failure scenarios
+
+// Suppress warnings from Anchor's internal behavior
+// These are framework-level warnings, not from our code
+#![allow(deprecated)]
+#![allow(ambiguous_glob_reexports)]
+
+use anchor_lang::prelude::*;
+
+// Import our modules
+pub mod instructions;
+pub mod state;
+pub mod events;
+pub mod errors;
+
+// Re-export for easier access
+pub use instructions::*;
+pub use state::*;
+pub use events::*;
+pub use errors::*;
+
+// Program ID
+declare_id!("8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ");
+
+/// Main program module containing all instruction handlers
+#[program]
+pub mod counter {
+    use super::*;
+
+    /// Initialize a new counter with predicate-registry integration
+    /// 
+    /// Creates a counter account and sets up integration with the predicate-registry.
+    /// The counter owner must have a policy set in the predicate-registry.
+    /// 
+    /// # Arguments
+    /// * `ctx` - The instruction context containing accounts
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    /// 
+    /// # Events
+    /// * `CounterInitialized` - Emitted when counter is successfully initialized
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        instructions::initialize(ctx)
+    }
+
+    /// Increment the counter after validating attestation
+    /// 
+    /// This function demonstrates protected business logic that requires
+    /// predicate validation before execution. It:
+    /// 1. Constructs a Task for the increment operation
+    /// 2. Makes a CPI call to validate_attestation on predicate-registry
+    /// 3. Only increments the counter if validation succeeds
+    /// 
+    /// # Arguments
+    /// * `ctx` - The instruction context containing accounts
+    /// * `task` - The task describing this increment operation
+    /// * `attestor_key` - The public key of the attestor
+    /// * `attestation` - The attestation from the attestor
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    /// 
+    /// # Events
+    /// * `CounterIncremented` - Emitted when counter is successfully incremented
+    pub fn increment(
+        ctx: Context<Increment>,
+        task: predicate_registry::Task,
+        attestor_key: Pubkey,
+        attestation: predicate_registry::Attestation,
+    ) -> Result<()> {
+        instructions::increment(ctx, task, attestor_key, attestation)
+    }
+
+    /// Get the current counter value
+    /// 
+    /// Public read-only function to retrieve the current counter value.
+    /// This function is not protected and can be called by anyone.
+    /// 
+    /// # Arguments
+    /// * `ctx` - The instruction context containing accounts
+    /// 
+    /// # Returns
+    /// * `Result<u64>` - The current counter value
+    pub fn get_value(ctx: Context<GetValue>) -> Result<u64> {
+        instructions::get_value(ctx)
+    }
+}
