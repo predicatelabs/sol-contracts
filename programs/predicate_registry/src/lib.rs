@@ -155,6 +155,7 @@ pub mod predicate_registry {
     /// - Statement hasn't expired
     /// - Attestation signature is valid
     /// - Policy matches
+    /// - UUID hasn't been used before (replay protection)
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
@@ -167,6 +168,7 @@ pub mod predicate_registry {
     /// 
     /// # Events
     /// * `StatementValidated` - Emitted when statement is successfully validated
+    /// * `UuidMarkedUsed` - Emitted when UUID is marked as used
     /// 
     /// # Errors
     /// * `AttesterNotRegisteredForValidation` - If attester is not registered
@@ -176,6 +178,7 @@ pub mod predicate_registry {
     /// * `StatementIdMismatch` - If statement and attestation UUIDs don't match
     /// * `ExpirationMismatch` - If statement and attestation expirations don't match
     /// * `WrongAttester` - If signature doesn't match provided attester
+    /// * `UuidAlreadyUsed` - If UUID has already been validated (replay attack)
     pub fn validate_attestation(
         ctx: Context<ValidateAttestation>, 
         statement: Statement, 
@@ -183,6 +186,24 @@ pub mod predicate_registry {
         attestation: Attestation
     ) -> Result<()> {
         instructions::validate_attestation(ctx, statement, attester_key, attestation).map(|_| ())
+    }
+
+    /// Cleanup an expired UUID account to reclaim rent
+    /// 
+    /// Allows anyone to cleanup expired UUID accounts, returning the rent
+    /// to the original validator (payer). This is permissionless and can be
+    /// called by anyone after the statement has expired.
+    /// 
+    /// # Arguments
+    /// * `ctx` - The instruction context containing accounts
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    /// 
+    /// # Errors
+    /// * `StatementNotExpired` - If statement hasn't expired yet
+    pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
+        instructions::cleanup_expired_uuid(ctx)
     }
 
     /// Transfer registry authority to a new account

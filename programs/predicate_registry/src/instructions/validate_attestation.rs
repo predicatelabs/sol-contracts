@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use crate::instructions::ValidateAttestation;
 use crate::state::{Statement, Attestation};
-use crate::events::StatementValidated;
+use crate::events::{StatementValidated, UuidMarkedUsed};
 use crate::errors::PredicateRegistryError;
 use anchor_lang::solana_program::{
     ed25519_program,
@@ -42,6 +42,7 @@ pub fn validate_attestation(
     let registry: &mut Account<'_, crate::PredicateRegistry> = &mut ctx.accounts.registry;
     let attester_account = &mut ctx.accounts.attester_account;
     let policy_account = &ctx.accounts.policy_account;
+    let used_uuid_account = &mut ctx.accounts.used_uuid_account;
     let validator = &ctx.accounts.validator;
     
     // Get current timestamp with error handling
@@ -129,7 +130,26 @@ pub fn validate_attestation(
         &ctx.accounts.instructions_sysvar,
     )?;
 
-    // Emit events
+    // === REPLAY PROTECTION: Mark UUID as used ===
+    // Note: The `init` constraint on used_uuid_account will automatically fail
+    // if the UUID account already exists, preventing replay attacks.
+    // This is the primary replay protection mechanism.
+    
+    // Initialize the used_uuid_account
+    used_uuid_account.uuid = statement.uuid;
+    used_uuid_account.used_at = current_timestamp;
+    used_uuid_account.expires_at = statement.expiration;
+    used_uuid_account.validator = validator.key();
+
+    // Emit UUID marked as used event
+    emit!(UuidMarkedUsed {
+        uuid: statement.format_uuid(),
+        validator: validator.key(),
+        expires_at: statement.expiration,
+        timestamp: current_timestamp,
+    });
+
+    // Emit statement validated event
     emit!(StatementValidated {
         registry: registry.key(),
         msg_sender: statement.msg_sender,

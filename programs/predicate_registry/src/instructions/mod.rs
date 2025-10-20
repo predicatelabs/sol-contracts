@@ -15,6 +15,7 @@ pub mod deregister_attester;
 pub mod set_policy_id;
 pub mod update_policy_id;
 pub mod validate_attestation;
+pub mod cleanup_expired_uuid;
 pub mod transfer_authority;
 
 // Re-export instruction functions
@@ -24,6 +25,7 @@ pub use deregister_attester::*;
 pub use set_policy_id::*;
 pub use update_policy_id::*;
 pub use validate_attestation::*;
+pub use cleanup_expired_uuid::*;
 pub use transfer_authority::*;
 
 /// Account validation context for initializing a new registry
@@ -182,8 +184,23 @@ pub struct ValidateAttestation<'info> {
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
-    /// The validator calling this instruction
+    /// The used UUID account (replay protection)
+    /// Must be created for first use, will fail if already exists
+    #[account(
+        init,
+        payer = validator,
+        space = 8 + UsedUuidAccount::INIT_SPACE,
+        seeds = [b"used_uuid", statement.uuid.as_ref()],
+        bump
+    )]
+    pub used_uuid_account: Account<'info, UsedUuidAccount>,
+    
+    /// The validator calling this instruction (also payer for UUID account)
+    #[account(mut)]
     pub validator: Signer<'info>,
+    
+    /// System program for account creation
+    pub system_program: Program<'info, System>,
     
     /// Instructions sysvar for signature verification
     /// CHECK: This is the instructions sysvar account
@@ -209,6 +226,24 @@ pub struct TransferAuthority<'info> {
     /// The new authority (must be a valid account)
     /// CHECK: This is safe because we only store the pubkey
     pub new_authority: AccountInfo<'info>,
+}
+
+/// Account validation context for cleaning up expired UUIDs
+#[derive(Accounts)]
+pub struct CleanupExpiredUuid<'info> {
+    /// The used UUID account to be cleaned up (closed)
+    #[account(
+        mut,
+        close = validator_recipient,
+        seeds = [b"used_uuid", &used_uuid_account.uuid],
+        bump
+    )]
+    pub used_uuid_account: Account<'info, UsedUuidAccount>,
+    
+    /// The original validator (payer) who will receive the rent refund
+    /// CHECK: This is the account that originally paid for the UUID account
+    #[account(mut)]
+    pub validator_recipient: AccountInfo<'info>,
 }
 
 /// Account validation context for getting registered attestors (view function)

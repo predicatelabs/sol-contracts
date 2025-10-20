@@ -102,7 +102,9 @@ fn validate_attestation_cpi(
         registry: ctx.accounts.predicate_registry.to_account_info(),
         attester_account: ctx.accounts.attester_account.to_account_info(),
         policy_account: ctx.accounts.policy_account.to_account_info(),
+        used_uuid_account: ctx.accounts.used_uuid_account.to_account_info(),
         validator: ctx.accounts.owner.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
         instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
     };
 
@@ -127,6 +129,7 @@ fn encode_increment_signature() -> Vec<u8> {
 }
 
 #[derive(Accounts)]
+#[instruction(statement: Statement)]
 pub struct Increment<'info> {
     #[account(
         mut,
@@ -138,6 +141,7 @@ pub struct Increment<'info> {
     pub counter: Account<'info, CounterAccount>,
 
     /// The owner of the counter who is calling increment
+    #[account(mut)]
     pub owner: Signer<'info>,
 
     /// The predicate registry account
@@ -161,10 +165,14 @@ pub struct Increment<'info> {
     )]
     pub policy_account: Account<'info, PolicyAccount>,
 
+    #[account(mut)]
+    pub used_uuid_account: AccountInfo<'info>,
+
     /// Instructions sysvar for signature verification
     /// CHECK: This is validated in the predicate registry program
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: AccountInfo<'info>,
 
     pub predicate_registry_program: Program<'info, PredicateRegistry>,
+    pub system_program: Program<'info, System>,
 }

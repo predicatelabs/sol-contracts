@@ -109,4 +109,17 @@ pub struct PolicyUpdated {
     pub timestamp: i64,
 }
 
+/// Event emitted when a UUID is marked as used (replay protection)
+#[event]
+pub struct UuidMarkedUsed {
+    /// The UUID that was marked as used (formatted)
+    pub uuid: String,
+    /// Who validated it (payer/validator)
+    pub validator: Pubkey,
+    /// When the statement expires
+    pub expires_at: i64,
+    /// Timestamp when marked as used
+    pub timestamp: i64,
+}
+
 

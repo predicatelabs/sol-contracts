@@ -366,6 +366,14 @@ async function incrementCounter(
     signature
   );
 
+  // Calculate used UUID PDA (for replay protection)
+  const [usedUuidPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("used_uuid"), Buffer.from(statement.uuid)],
+    predicateProgram.programId
+  );
+
+  console.log(`   UUID PDA (replay protection): ${usedUuidPda.toString()}`);
+
   // Create message hash for Ed25519 verification instruction
   const messageHash = createMessageHash(statement, owner.publicKey);
 
@@ -385,8 +393,10 @@ async function incrementCounter(
       predicateRegistry: pdas.registryPda,
       attesterAccount: pdas.attesterPda,
       policyAccount: pdas.policyPda,
+      usedUuidAccount: usedUuidPda,
       instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
       predicateRegistryProgram: predicateProgram.programId,
+      systemProgram: anchor.web3.SystemProgram.programId,
     } as any)
     .instruction();
 

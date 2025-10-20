@@ -48,6 +48,20 @@ pub struct PolicyAccount {
     pub updated_at: i64,
 }
 
+/// Account for tracking used UUIDs to prevent replay attacks
+#[account]
+#[derive(InitSpace)]
+pub struct UsedUuidAccount {
+    /// The UUID that was used (16 bytes)
+    pub uuid: [u8; 16],
+    /// When it was first used
+    pub used_at: i64,
+    /// When the statement expires (for cleanup eligibility)
+    pub expires_at: i64,
+    /// Who validated it (the payer/validator)
+    pub validator: Pubkey,
+}
+
 
 
 /// Statement structure matching the Solidity version

@@ -81,6 +81,14 @@ pub enum PredicateRegistryError {
     #[msg("Policy ID mismatch: Statement policy ID does not match account policy ID")]
     PolicyIdMismatch,
     
+    /// Error when UUID has already been used (replay attack prevention)
+    #[msg("UUID already used: This attestation has already been validated")]
+    UuidAlreadyUsed,
+    
+    /// Error when trying to cleanup a UUID that hasn't expired yet
+    #[msg("Statement not expired: Cannot cleanup UUID before statement expiration")]
+    StatementNotExpired,
+    
     /// Error when statement has expired
     #[msg("Statement expired: The statement has passed its expiration time")]
     StatementExpired,
