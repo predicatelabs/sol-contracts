@@ -165,6 +165,8 @@ pub struct Increment<'info> {
     )]
     pub policy_account: Account<'info, PolicyAccount>,
 
+    /// The used UUID account (passed through to predicate registry for replay protection)
+    /// CHECK: This will be validated and initialized in the predicate registry program
     #[account(mut)]
     pub used_uuid_account: AccountInfo<'info>,
 
