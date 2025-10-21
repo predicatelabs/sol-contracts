@@ -5,9 +5,9 @@ use predicate_registry::{
     cpi::accounts::ValidateAttestation,
     program::PredicateRegistry,
     PredicateRegistry as PredicateRegistryAccount,
-    AttestorAccount,
+    AttesterAccount,
     PolicyAccount,
-    Task,
+    Statement,
     Attestation,
 };
 use crate::state::CounterAccount;
@@ -18,15 +18,15 @@ use crate::errors::CounterError;
 /// 
 /// This function demonstrates protected business logic that requires
 /// predicate validation before execution. It:
-/// 1. Constructs a Task for the increment operation
+/// 1. Constructs a Statement for the increment operation
 /// 2. Makes a CPI call to validate_attestation on predicate-registry
 /// 3. Only increments the counter if validation succeeds
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `task` - The task describing this increment operation
-/// * `attestor_key` - The public key of the attestor
-/// * `attestation` - The attestation from the attestor
+/// * `statement` - The statement describing this increment operation
+/// * `attester_key` - The public key of the attester
+/// * `attestation` - The attestation from the attester
 /// 
 /// # Returns
 /// * `Result<()>` - Success or error
@@ -35,34 +35,34 @@ use crate::errors::CounterError;
 /// * `CounterIncremented` - Emitted when counter is successfully incremented
 pub fn increment(
     ctx: Context<Increment>,
-    task: Task,
-    attestor_key: Pubkey,
+    statement: Statement,
+    attester_key: Pubkey,
     attestation: Attestation,
 ) -> Result<()> {
-    // Validate that the task is for this specific increment operation
+    // Validate that the statement is for this specific increment operation
     let expected_encoded_sig = encode_increment_signature();
     require!(
-        task.encoded_sig_and_args == expected_encoded_sig,
-        CounterError::InvalidTask
+        statement.encoded_sig_and_args == expected_encoded_sig,
+        CounterError::InvalidStatement
     );
 
-    // Validate that the task sender matches the counter owner
+    // Validate that the statement sender matches the counter owner
     require!(
-        task.msg_sender == ctx.accounts.counter.owner,
+        statement.msg_sender == ctx.accounts.counter.owner,
         CounterError::Unauthorized
     );
 
-    // Validate that the task target matches this program
+    // Validate that the statement target matches this program
     require!(
-        task.target == crate::ID,
-        CounterError::InvalidTask
+        statement.target == crate::ID,
+        CounterError::InvalidStatement
     );
 
     // Make CPI call to validate attestation
     validate_attestation_cpi(
         &ctx,
-        task,
-        attestor_key,
+        statement,
+        attester_key,
         attestation,
     )?;
 
@@ -94,15 +94,17 @@ pub fn increment(
 /// Make a CPI call to validate attestation
 fn validate_attestation_cpi(
     ctx: &Context<Increment>,
-    task: Task,
-    attestor_key: Pubkey,
+    statement: Statement,
+    attester_key: Pubkey,
     attestation: Attestation,
 ) -> Result<()> {
     let cpi_accounts = ValidateAttestation {
         registry: ctx.accounts.predicate_registry.to_account_info(),
-        attestor_account: ctx.accounts.attestor_account.to_account_info(),
+        attester_account: ctx.accounts.attester_account.to_account_info(),
         policy_account: ctx.accounts.policy_account.to_account_info(),
+        used_uuid_account: ctx.accounts.used_uuid_account.to_account_info(),
         validator: ctx.accounts.owner.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
         instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
     };
 
@@ -111,15 +113,15 @@ fn validate_attestation_cpi(
 
     predicate_registry::cpi::validate_attestation(
         cpi_ctx,
-        task,
-        attestor_key,
+        statement,
+        attester_key,
         attestation,
     )?;
 
     Ok(())
 }
 
-/// Encode the increment function signature for task validation
+/// Encode the increment function signature for statement validation
 fn encode_increment_signature() -> Vec<u8> {
     // This represents the signature of the increment function call
     // In a real implementation, this might include parameters
@@ -127,6 +129,7 @@ fn encode_increment_signature() -> Vec<u8> {
 }
 
 #[derive(Accounts)]
+#[instruction(statement: Statement)]
 pub struct Increment<'info> {
     #[account(
         mut,
@@ -138,20 +141,21 @@ pub struct Increment<'info> {
     pub counter: Account<'info, CounterAccount>,
 
     /// The owner of the counter who is calling increment
+    #[account(mut)]
     pub owner: Signer<'info>,
 
     /// The predicate registry account
     #[account(mut)]
     pub predicate_registry: Account<'info, PredicateRegistryAccount>,
 
-    /// Attestor account in the predicate registry
+    /// Attester account in the predicate registry
     #[account(
         mut,
-        seeds = [b"attestor", attestor_account.attestor.as_ref()],
+        seeds = [b"attester", attester_account.attester.as_ref()],
         bump,
         seeds::program = predicate_registry_program.key()
     )]
-    pub attestor_account: Account<'info, AttestorAccount>,
+    pub attester_account: Account<'info, AttesterAccount>,
 
     /// Policy account for the counter owner
     #[account(
@@ -161,10 +165,16 @@ pub struct Increment<'info> {
     )]
     pub policy_account: Account<'info, PolicyAccount>,
 
+    /// The used UUID account (passed through to predicate registry for replay protection)
+    /// CHECK: This will be validated and initialized in the predicate registry program
+    #[account(mut)]
+    pub used_uuid_account: AccountInfo<'info>,
+
     /// Instructions sysvar for signature verification
     /// CHECK: This is validated in the predicate registry program
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: AccountInfo<'info>,
 
     pub predicate_registry_program: Program<'info, PredicateRegistry>,
+    pub system_program: Program<'info, System>,
 }

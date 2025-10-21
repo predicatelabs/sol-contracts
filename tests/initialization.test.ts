@@ -26,7 +26,7 @@ describe("Registry Initialization", () => {
         context.authority.keypair.publicKey.toString()
       );
       expect(
-        registryAccount.totalAttestors.toNumber()
+        registryAccount.totalAttesters.toNumber()
       ).to.be.greaterThanOrEqual(0);
       expect(registryAccount.totalPolicies.toNumber()).to.be.greaterThanOrEqual(
         0

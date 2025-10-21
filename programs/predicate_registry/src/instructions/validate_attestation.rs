@@ -2,28 +2,28 @@
 
 use anchor_lang::prelude::*;
 use crate::instructions::ValidateAttestation;
-use crate::state::{Task, Attestation};
-use crate::events::TaskValidated;
+use crate::state::{Statement, Attestation};
+use crate::events::{StatementValidated, UuidMarkedUsed};
 use crate::errors::PredicateRegistryError;
 use anchor_lang::solana_program::{
     ed25519_program,
     sysvar::instructions::{self, load_current_index_checked, load_instruction_at_checked},
 };
 
-/// Validate an attestation for a task
+/// Validate an attestation for a statement
 /// 
 /// This function performs comprehensive validation of an attestation including:
 /// - Input validation and sanitization
-/// - Expiration checks for both task and attestation
+/// - Expiration checks for both statement and attestation
 /// - Policy verification
-/// - Attestor registration verification
+/// - Attester registration verification
 /// - Ed25519 signature verification using Solana's native program
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `task` - The task to be validated
-/// * `attestation` - The attestation from the attestor
-/// * `attestor_key` - The public key of the attestor
+/// * `statement` - The statement to be validated
+/// * `attestation` - The attestation from the attester
+/// * `attester_key` - The public key of the attester
 /// 
 /// # Returns
 /// * `Result<bool>` - True if validation successful
@@ -35,13 +35,14 @@ use anchor_lang::solana_program::{
 /// - Comprehensive error handling with specific error types
 pub fn validate_attestation(
     ctx: Context<ValidateAttestation>, 
-    task: Task, 
-    attestor_key: Pubkey,
+    statement: Statement, 
+    attester_key: Pubkey,
     attestation: Attestation
 ) -> Result<bool> {
     let registry: &mut Account<'_, crate::PredicateRegistry> = &mut ctx.accounts.registry;
-    let attestor_account = &mut ctx.accounts.attestor_account;
+    let attester_account = &mut ctx.accounts.attester_account;
     let policy_account = &ctx.accounts.policy_account;
+    let used_uuid_account = &mut ctx.accounts.used_uuid_account;
     let validator = &ctx.accounts.validator;
     
     // Get current timestamp with error handling
@@ -56,23 +57,23 @@ pub fn validate_attestation(
         PredicateRegistryError::InvalidSignature
     );
 
-    // Validate policy is not empty
+    // Validate policy ID is not empty
     require!(
-        !task.get_policy().is_empty() && !policy_account.get_policy().is_empty(),
-        PredicateRegistryError::InvalidPolicy
+        !statement.policy_id.is_empty() && !policy_account.policy_id.is_empty(),
+        PredicateRegistryError::InvalidPolicyId
     );
 
     // === BUSINESS LOGIC VALIDATION ===
 
-    // Check if task ID matches attestation ID
+    // Check if statement ID matches attestation ID
     require!(
-        task.uuid == attestation.uuid,
-        PredicateRegistryError::TaskIdMismatch
+        statement.uuid == attestation.uuid,
+        PredicateRegistryError::StatementIdMismatch
     );
 
-    // Check if task expiration matches attestation expiration
+    // Check if statement expiration matches attestation expiration
     require!(
-        task.expiration == attestation.expiration,
+        statement.expiration == attestation.expiration,
         PredicateRegistryError::ExpirationMismatch
     );
 
@@ -83,70 +84,89 @@ pub fn validate_attestation(
         PredicateRegistryError::AttestationExpired
     );
 
-    // Check if task has expired
+    // Check if statement has expired
     require!(
-        current_timestamp <= task.expiration + CLOCK_DRIFT_BUFFER,
-        PredicateRegistryError::TaskExpired
+        current_timestamp <= statement.expiration + CLOCK_DRIFT_BUFFER,
+        PredicateRegistryError::StatementExpired
     );
 
-    // Verify the policy matches exactly
+    // Verify the policy ID matches exactly
     require!(
-        task.get_policy() == policy_account.get_policy(),
-        PredicateRegistryError::InvalidPolicy
+        statement.policy_id == policy_account.policy_id,
+        PredicateRegistryError::PolicyIdMismatch
     );
 
-    // Verify that the attestor key matches the provided attestor_key parameter
+    // Verify that the attester key matches the provided attester_key parameter
     require!(
-        attestor_key == attestor_account.attestor,
-        PredicateRegistryError::WrongAttestor
+        attester_key == attester_account.attester,
+        PredicateRegistryError::WrongAttester
     );
 
-    // Verify that the attestor in the attestation matches the registered attestor
+    // Verify that the attester in the attestation matches the registered attester
     require!(
-        attestation.attestor == attestor_account.attestor,
-        PredicateRegistryError::WrongAttestor
+        attestation.attester == attester_account.attester,
+        PredicateRegistryError::WrongAttester
     );
 
-    // Verify that the attestor is registered and active
+    // Verify that the attester is registered and active
     require!(
-        attestor_account.is_registered,
-        PredicateRegistryError::AttestorNotRegisteredForValidation
+        attester_account.is_registered,
+        PredicateRegistryError::AttesterNotRegisteredForValidation
     );
 
 
     // === SIGNATURE VERIFICATION ===
     
-    // Hash the task for signature verification
-    let message_hash = task.hash_task_safe(validator.key());
+    // Hash the statement for signature verification
+    let message_hash = statement.hash_statement_safe(validator.key());
     
     // Verify Ed25519 signature using Solana's native verification
     // This implementation checks that the ed25519 verification instruction was included
     // in the same transaction as this instruction
     verify_ed25519_signature(
         &attestation.signature,
-        &attestation.attestor.to_bytes(),
+        &attestation.attester.to_bytes(),
         &message_hash,
         &ctx.accounts.instructions_sysvar,
     )?;
 
-    // Emit events
-    emit!(TaskValidated {
+    // === REPLAY PROTECTION: Mark UUID as used ===
+    // Note: The `init` constraint on used_uuid_account will automatically fail
+    // if the UUID account already exists, preventing replay attacks.
+    // This is the primary replay protection mechanism.
+    
+    // Initialize the used_uuid_account
+    used_uuid_account.uuid = statement.uuid;
+    used_uuid_account.used_at = current_timestamp;
+    used_uuid_account.expires_at = statement.expiration;
+    used_uuid_account.validator = validator.key();
+
+    // Emit UUID marked as used event
+    emit!(UuidMarkedUsed {
+        uuid: statement.format_uuid(),
+        validator: validator.key(),
+        expires_at: statement.expiration,
+        timestamp: current_timestamp,
+    });
+
+    // Emit statement validated event
+    emit!(StatementValidated {
         registry: registry.key(),
-        msg_sender: task.msg_sender,
-        target: task.target,
-        attestor: attestation.attestor,
-        msg_value: task.msg_value,
-        policy: String::from_utf8_lossy(task.get_policy()).to_string(),
-        uuid: task.format_uuid(),
-        expiration: task.expiration,
+        msg_sender: statement.msg_sender,
+        target: statement.target,
+        attester: attestation.attester,
+        msg_value: statement.msg_value,
+        policy_id: statement.policy_id.clone(),
+        uuid: statement.format_uuid(),
+        expiration: statement.expiration,
         timestamp: clock.unix_timestamp,
     });
 
     msg!(
-        "Task {} validated by attestor {} for client {}",
-        task.format_uuid(),
-        attestation.attestor,
-        task.msg_sender
+        "Statement {} validated by attester {} for client {}",
+        statement.format_uuid(),
+        attestation.attester,
+        statement.msg_sender
     );
 
     Ok(true)
