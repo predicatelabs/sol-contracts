@@ -17,63 +17,63 @@ pub struct RegistryInitialized {
     pub timestamp: i64,
 }
 
-/// Event emitted when an attester is registered
+/// Event emitted when an attestor is registered
 #[event]
-pub struct AttesterRegistered {
+pub struct AttestorRegistered {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The attester that was registered
-    pub attester: Pubkey,
-    /// The authority who registered the attester
+    /// The attestor that was registered
+    pub attestor: Pubkey,
+    /// The authority who registered the attestor
     pub authority: Pubkey,
     /// Timestamp when registered
     pub timestamp: i64,
 }
 
-/// Event emitted when an attester is deregistered
+/// Event emitted when an attestor is deregistered
 #[event]
-pub struct AttesterDeregistered {
+pub struct AttestorDeregistered {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The attester that was deregistered
-    pub attester: Pubkey,
-    /// The authority who deregistered the attester
+    /// The attestor that was deregistered
+    pub attestor: Pubkey,
+    /// The authority who deregistered the attestor
     pub authority: Pubkey,
     /// Timestamp when deregistered
     pub timestamp: i64,
 }
 
-/// Event emitted when a policy ID is set for a client
+/// Event emitted when a policy is set for a client
 #[event]
 pub struct PolicySet {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The client for whom the policy ID was set
+    /// The client for whom the policy was set
     pub client: Pubkey,
-    /// The account that set the policy ID (should be same as client)
+    /// The account that set the policy (should be same as client)
     pub setter: Pubkey,
-    /// The policy ID string
-    pub policy_id: String,
+    /// The policy string
+    pub policy: String,
     /// Timestamp when policy was set
     pub timestamp: i64,
 }
 
-/// Event emitted when a statement is validated
+/// Event emitted when a task is validated
 #[event]
-pub struct StatementValidated {
+pub struct TaskValidated {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The message sender from the statement
+    /// The message sender from the task
     pub msg_sender: Pubkey,
-    /// The target address from the statement
+    /// The target address from the task
     pub target: Pubkey,
-    /// The attester who validated the statement
-    pub attester: Pubkey,
-    /// The message value from the statement
+    /// The attestor who validated the task
+    pub attestor: Pubkey,
+    /// The message value from the task
     pub msg_value: u64,
-    /// The policy ID used for validation
-    pub policy_id: String,
-    /// The unique statement identifier
+    /// The policy used for validation
+    pub policy: String,
+    /// The unique task identifier
     pub uuid: String,
     /// The expiration timestamp
     pub expiration: i64,
@@ -94,31 +94,18 @@ pub struct AuthorityTransferred {
     pub timestamp: i64,
 }
 
-/// Event emitted when a policy ID is updated
+/// Event emitted when a policy is updated
 #[event]
 pub struct PolicyUpdated {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The client whose policy ID was updated
+    /// The client whose policy was updated
     pub client: Pubkey,
-    /// The previous policy ID string
-    pub previous_policy_id: String,
-    /// The new policy ID string
-    pub new_policy_id: String,
+    /// The previous policy string
+    pub previous_policy: String,
+    /// The new policy string
+    pub new_policy: String,
     /// Timestamp when updated
-    pub timestamp: i64,
-}
-
-/// Event emitted when a UUID is marked as used (replay protection)
-#[event]
-pub struct UuidMarkedUsed {
-    /// The UUID that was marked as used (formatted)
-    pub uuid: String,
-    /// Who validated it (payer/validator)
-    pub validator: Pubkey,
-    /// When the statement expires
-    pub expires_at: i64,
-    /// Timestamp when marked as used
     pub timestamp: i64,
 }
 

@@ -66,15 +66,15 @@ pub mod counter {
     /// 
     /// This function demonstrates protected business logic that requires
     /// predicate validation before execution. It:
-    /// 1. Constructs a Statement for the increment operation
+    /// 1. Constructs a Task for the increment operation
     /// 2. Makes a CPI call to validate_attestation on predicate-registry
     /// 3. Only increments the counter if validation succeeds
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `statement` - The statement describing this increment operation
-    /// * `attester_key` - The public key of the attester
-    /// * `attestation` - The attestation from the attester
+    /// * `task` - The task describing this increment operation
+    /// * `attestor_key` - The public key of the attestor
+    /// * `attestation` - The attestation from the attestor
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -83,11 +83,11 @@ pub mod counter {
     /// * `CounterIncremented` - Emitted when counter is successfully incremented
     pub fn increment(
         ctx: Context<Increment>,
-        statement: predicate_registry::Statement,
-        attester_key: Pubkey,
+        task: predicate_registry::Task,
+        attestor_key: Pubkey,
         attestation: predicate_registry::Attestation,
     ) -> Result<()> {
-        instructions::increment(ctx, statement, attester_key, attestation)
+        instructions::increment(ctx, task, attestor_key, attestation)
     }
 
     /// Get the current counter value

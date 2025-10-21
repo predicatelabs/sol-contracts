@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { Keypair, SystemProgram } from "@solana/web3.js";
 import {
-  findAttesterPDA,
-  registerAttester,
+  findAttestorPDA,
+  registerAttestor,
   createFundedKeypair,
   createTestAccount,
 } from "./helpers/test-utils";
@@ -11,76 +11,76 @@ import {
   SharedTestContext,
 } from "./helpers/shared-setup";
 
-describe("Attester Management", () => {
+describe("Attestor Management", () => {
   let context: SharedTestContext;
 
   before(async () => {
     context = await setupSharedTestContext();
   });
 
-  describe("Attester Registration", () => {
-    it("Should register single attester successfully", async () => {
-      const attester1 = await createTestAccount(context.provider);
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+  describe("Attestor Registration", () => {
+    it("Should register single attestor successfully", async () => {
+      const attestor1 = await createTestAccount(context.provider);
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
       const registryBefore =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
+      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
 
-      const tx = await registerAttester(
+      const tx = await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
 
       expect(tx).to.be.a("string");
 
-      // Verify attester account state
-      const attesterAccount =
-        await context.program.account.attesterAccount.fetch(attesterPda);
-      expect(attesterAccount.attester.toString()).to.equal(
-        attester1.keypair.publicKey.toString()
+      // Verify attestor account state
+      const attestorAccount =
+        await context.program.account.attestorAccount.fetch(attestorPda);
+      expect(attestorAccount.attestor.toString()).to.equal(
+        attestor1.keypair.publicKey.toString()
       );
-      expect(attesterAccount.isRegistered).to.be.true;
-      expect(attesterAccount.registeredAt.toNumber()).to.be.greaterThan(0);
+      expect(attestorAccount.isRegistered).to.be.true;
+      expect(attestorAccount.registeredAt.toNumber()).to.be.greaterThan(0);
 
       // Verify registry statistics
       const registryAfter =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAfter.totalAttesters.toNumber()).to.equal(
-        totalAttestersBefore + 1
+      expect(registryAfter.totalAttestors.toNumber()).to.equal(
+        totalAttestorsBefore + 1
       );
       expect(registryAfter.updatedAt.toNumber()).to.be.at.least(
         registryBefore.updatedAt.toNumber()
       );
     });
 
-    it("Should register multiple attesters", async () => {
-      const attester1 = await createTestAccount(context.provider);
-      const attester2 = await createTestAccount(context.provider);
-      const attesters = [
-        attester1.keypair.publicKey,
-        attester2.keypair.publicKey,
+    it("Should register multiple attestors", async () => {
+      const attestor1 = await createTestAccount(context.provider);
+      const attestor2 = await createTestAccount(context.provider);
+      const attestors = [
+        attestor1.keypair.publicKey,
+        attestor2.keypair.publicKey,
       ];
 
       const initialRegistry =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialCount = initialRegistry.totalAttesters.toNumber();
+      const initialCount = initialRegistry.totalAttestors.toNumber();
 
-      for (let i = 0; i < attesters.length; i++) {
-        await registerAttester(
+      for (let i = 0; i < attestors.length; i++) {
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attesters[i],
+          attestors[i],
           context.registry.registryPda
         );
 
@@ -88,24 +88,24 @@ describe("Attester Management", () => {
           await context.program.account.predicateRegistry.fetch(
             context.registry.registryPda
           );
-        expect(registryAccount.totalAttesters.toNumber()).to.equal(
+        expect(registryAccount.totalAttestors.toNumber()).to.equal(
           initialCount + i + 1
         );
       }
     });
 
-    it("Should emit AttesterRegistered event", async () => {
-      const attester1 = await createTestAccount(context.provider);
+    it("Should emit AttestorRegistered event", async () => {
+      const attestor1 = await createTestAccount(context.provider);
       let eventReceived = false;
 
       const listener = context.program.addEventListener(
-        "attesterRegistered",
+        "attestorRegistered",
         (event: any) => {
           expect(event.registry.toString()).to.equal(
             context.registry.registryPda.toString()
           );
-          expect(event.attester.toString()).to.equal(
-            attester1.keypair.publicKey.toString()
+          expect(event.attestor.toString()).to.equal(
+            attestor1.keypair.publicKey.toString()
           );
           expect(event.authority.toString()).to.equal(
             context.authority.keypair.publicKey.toString()
@@ -115,10 +115,10 @@ describe("Attester Management", () => {
         }
       );
 
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
 
@@ -130,19 +130,19 @@ describe("Attester Management", () => {
     });
 
     it("Should fail to register with unauthorized authority", async () => {
-      const attester1 = await createTestAccount(context.provider);
+      const attestor1 = await createTestAccount(context.provider);
       const unauthorizedAuthority = await createFundedKeypair(context.provider);
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .registerAttester(attester1.keypair.publicKey)
+          .registerAttestor(attestor1.keypair.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: unauthorizedAuthority.publicKey,
             systemProgram: SystemProgram.programId,
           })
@@ -155,29 +155,29 @@ describe("Attester Management", () => {
       }
     });
 
-    it("Should fail to register same attester twice", async () => {
-      const attester1 = await createTestAccount(context.provider);
+    it("Should fail to register same attestor twice", async () => {
+      const attestor1 = await createTestAccount(context.provider);
 
       // First registration
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
 
       // Second registration should fail
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .registerAttester(attester1.keypair.publicKey)
+          .registerAttestor(attestor1.keypair.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: context.authority.keypair.publicKey,
             systemProgram: SystemProgram.programId,
           })
@@ -192,7 +192,7 @@ describe("Attester Management", () => {
 
     it("Should handle registration with different authority after transfer", async () => {
       const newAuthority = await createTestAccount(context.provider);
-      const attester1 = await createTestAccount(context.provider);
+      const attestor1 = await createTestAccount(context.provider);
 
       // Transfer authority first
       await context.program.methods
@@ -206,20 +206,20 @@ describe("Attester Management", () => {
         .rpc();
 
       // Register with new authority
-      await registerAttester(
+      await registerAttestor(
         context.program,
         newAuthority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
 
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
-      const attesterAccount =
-        await context.program.account.attesterAccount.fetch(attesterPda);
-      expect(attesterAccount.isRegistered).to.be.true;
+      const attestorAccount =
+        await context.program.account.attestorAccount.fetch(attestorPda);
+      expect(attestorAccount.isRegistered).to.be.true;
 
       // Transfer authority back to original authority
       await context.program.methods
@@ -234,56 +234,56 @@ describe("Attester Management", () => {
     });
   });
 
-  describe("Attester Deregistration", () => {
-    let attester1: any, attester2: any;
+  describe("Attestor Deregistration", () => {
+    let attestor1: any, attestor2: any;
 
     beforeEach(async () => {
-      // Create fresh attesters for each test
-      attester1 = await createTestAccount(context.provider);
-      attester2 = await createTestAccount(context.provider);
+      // Create fresh attestors for each test
+      attestor1 = await createTestAccount(context.provider);
+      attestor2 = await createTestAccount(context.provider);
 
-      // Register attesters for deregistration tests
-      await registerAttester(
+      // Register attestors for deregistration tests
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester2.keypair.publicKey,
+        attestor2.keypair.publicKey,
         context.registry.registryPda
       );
     });
 
-    it("Should deregister attester successfully", async () => {
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+    it("Should deregister attestor successfully", async () => {
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
       const registryBefore =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
+      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
 
       await context.program.methods
-        .deregisterAttester(attester1.keypair.publicKey)
+        .deregisterAttestor(attestor1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
         .rpc();
 
-      // Verify attester is deregistered
-      const attesterAccount =
-        await context.program.account.attesterAccount.fetch(attesterPda);
-      expect(attesterAccount.isRegistered).to.be.false;
-      expect(attesterAccount.attester.toString()).to.equal(
-        attester1.keypair.publicKey.toString()
+      // Verify attestor is deregistered
+      const attestorAccount =
+        await context.program.account.attestorAccount.fetch(attestorPda);
+      expect(attestorAccount.isRegistered).to.be.false;
+      expect(attestorAccount.attestor.toString()).to.equal(
+        attestor1.keypair.publicKey.toString()
       );
 
       // Verify registry statistics
@@ -291,26 +291,26 @@ describe("Attester Management", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAfter.totalAttesters.toNumber()).to.equal(
-        totalAttestersBefore - 1
+      expect(registryAfter.totalAttestors.toNumber()).to.equal(
+        totalAttestorsBefore - 1
       );
     });
 
-    it("Should emit AttesterDeregistered event", async () => {
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+    it("Should emit AttestorDeregistered event", async () => {
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
       let eventReceived = false;
 
       const listener = context.program.addEventListener(
-        "attesterDeregistered",
+        "attestorDeregistered",
         (event: any) => {
           expect(event.registry.toString()).to.equal(
             context.registry.registryPda.toString()
           );
-          expect(event.attester.toString()).to.equal(
-            attester1.keypair.publicKey.toString()
+          expect(event.attestor.toString()).to.equal(
+            attestor1.keypair.publicKey.toString()
           );
           expect(event.authority.toString()).to.equal(
             context.authority.keypair.publicKey.toString()
@@ -321,10 +321,10 @@ describe("Attester Management", () => {
       );
 
       await context.program.methods
-        .deregisterAttester(attester1.keypair.publicKey)
+        .deregisterAttestor(attestor1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
@@ -337,18 +337,18 @@ describe("Attester Management", () => {
     });
 
     it("Should fail to deregister with unauthorized authority", async () => {
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
       const unauthorizedAuthority = await createFundedKeypair(context.provider);
 
       try {
         await context.program.methods
-          .deregisterAttester(attester1.keypair.publicKey)
+          .deregisterAttestor(attestor1.keypair.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: unauthorizedAuthority.publicKey,
           })
           .signers([unauthorizedAuthority])
@@ -360,18 +360,18 @@ describe("Attester Management", () => {
       }
     });
 
-    it("Should fail to deregister non-registered attester", async () => {
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+    it("Should fail to deregister non-registered attestor", async () => {
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
 
       // First deregister
       await context.program.methods
-        .deregisterAttester(attester1.keypair.publicKey)
+        .deregisterAttestor(attestor1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
@@ -380,10 +380,10 @@ describe("Attester Management", () => {
       // Try to deregister again
       try {
         await context.program.methods
-          .deregisterAttester(attester1.keypair.publicKey)
+          .deregisterAttestor(attestor1.keypair.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: context.authority.keypair.publicKey,
           })
           .signers([context.authority.keypair])
@@ -391,23 +391,23 @@ describe("Attester Management", () => {
 
         expect.fail("Should have thrown an error");
       } catch (error: any) {
-        expect(error.message).to.include("AttesterNotRegistered");
+        expect(error.message).to.include("AttestorNotRegistered");
       }
     });
 
-    it("Should fail to deregister non-existent attester", async () => {
-      const nonExistentAttester = Keypair.generate();
-      const [attesterPda] = findAttesterPDA(
-        nonExistentAttester.publicKey,
+    it("Should fail to deregister non-existent attestor", async () => {
+      const nonExistentAttestor = Keypair.generate();
+      const [attestorPda] = findAttestorPDA(
+        nonExistentAttestor.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .deregisterAttester(nonExistentAttester.publicKey)
+          .deregisterAttestor(nonExistentAttestor.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: context.authority.keypair.publicKey,
           })
           .signers([context.authority.keypair])
@@ -421,43 +421,43 @@ describe("Attester Management", () => {
   });
 
   describe("Re-registration", () => {
-    it("Should allow re-registration of deregistered attester", async () => {
-      const attester1 = await createTestAccount(context.provider);
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+    it("Should allow re-registration of deregistered attestor", async () => {
+      const attestor1 = await createTestAccount(context.provider);
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
 
       // Register, deregister, then re-register
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
 
       await context.program.methods
-        .deregisterAttester(attester1.keypair.publicKey)
+        .deregisterAttestor(attestor1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
         .rpc();
 
       // Verify deregistered
-      let attesterAccount = await context.program.account.attesterAccount.fetch(
-        attesterPda
+      let attestorAccount = await context.program.account.attestorAccount.fetch(
+        attestorPda
       );
-      expect(attesterAccount.isRegistered).to.be.false;
+      expect(attestorAccount.isRegistered).to.be.false;
 
       // Re-register should work but fail because account already exists
       try {
-        await registerAttester(
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attester1.keypair.publicKey,
+          attestor1.keypair.publicKey,
           context.registry.registryPda
         );
         expect.fail("Should have thrown an error");
@@ -467,35 +467,35 @@ describe("Attester Management", () => {
     });
 
     it("Should maintain correct statistics during re-registration cycle", async () => {
-      const attester1 = await createTestAccount(context.provider);
+      const attestor1 = await createTestAccount(context.provider);
       const initialRegistry =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialCount = initialRegistry.totalAttesters.toNumber();
+      const initialCount = initialRegistry.totalAttestors.toNumber();
 
       // Register
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        attester1.keypair.publicKey,
+        attestor1.keypair.publicKey,
         context.registry.registryPda
       );
       let registry = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registry.totalAttesters.toNumber()).to.equal(initialCount + 1);
+      expect(registry.totalAttestors.toNumber()).to.equal(initialCount + 1);
 
       // Deregister
-      const [attesterPda] = findAttesterPDA(
-        attester1.keypair.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor1.keypair.publicKey,
         context.program.programId
       );
       await context.program.methods
-        .deregisterAttester(attester1.keypair.publicKey)
+        .deregisterAttestor(attestor1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
@@ -504,29 +504,29 @@ describe("Attester Management", () => {
       registry = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registry.totalAttesters.toNumber()).to.equal(initialCount);
+      expect(registry.totalAttestors.toNumber()).to.equal(initialCount);
     });
   });
 
   describe("Edge Cases", () => {
-    it("Should handle maximum number of attesters gracefully", async () => {
-      // Register multiple attesters to test counter limits
-      const attesters: Keypair[] = [];
+    it("Should handle maximum number of attestors gracefully", async () => {
+      // Register multiple attestors to test counter limits
+      const attestors: Keypair[] = [];
       for (let i = 0; i < 10; i++) {
-        attesters.push(Keypair.generate());
+        attestors.push(Keypair.generate());
       }
 
       const initialRegistry =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialCount = initialRegistry.totalAttesters.toNumber();
+      const initialCount = initialRegistry.totalAttestors.toNumber();
 
-      for (const attester of attesters) {
-        await registerAttester(
+      for (const attestor of attestors) {
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attester.publicKey,
+          attestor.publicKey,
           context.registry.registryPda
         );
       }
@@ -535,7 +535,7 @@ describe("Attester Management", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
         initialCount + 10
       );
     });

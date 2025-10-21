@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  Keypair,
-  PublicKey,
+import { 
+  Keypair, 
+  PublicKey, 
+  TransactionInstruction,
   Transaction,
-  Ed25519Program,
+  Ed25519Program
 } from "@solana/web3.js";
 import { expect } from "chai";
 import * as crypto from "crypto";
@@ -14,10 +15,10 @@ import {
 } from "./helpers/shared-setup";
 import {
   createTestAccount,
-  findAttesterPDA,
+  findAttestorPDA,
   findPolicyPDA,
-  registerAttesterIfNotExists,
-  setPolicyId,
+  registerAttestorIfNotExists,
+  setPolicy,
   getFutureTimestamp,
   getPastTimestamp,
   expectError,
@@ -25,10 +26,10 @@ import {
 
 describe("Validate Attestation", () => {
   let context: SharedTestContext;
-  let attester: Keypair;
+  let attestor: Keypair;
   let client: Keypair;
   let validator: Keypair;
-  let attesterPda: PublicKey;
+  let attestorPda: PublicKey;
   let policyPda: PublicKey;
 
   const testPolicy = "test-policy-v1";
@@ -38,42 +39,36 @@ describe("Validate Attestation", () => {
     context = await setupSharedTestContext();
 
     // Create test accounts
-    const attesterAccount = await createTestAccount(context.provider);
-    attester = attesterAccount.keypair;
-
+    const attestorAccount = await createTestAccount(context.provider);
+    attestor = attestorAccount.keypair;
+    
     const clientAccount = await createTestAccount(context.provider);
     client = clientAccount.keypair;
-
+    
     const validatorAccount = await createTestAccount(context.provider);
     validator = validatorAccount.keypair;
 
     // Get PDAs
-    const [attesterPdaResult] = findAttesterPDA(
-      attester.publicKey,
-      context.program.programId
-    );
-    attesterPda = attesterPdaResult;
+    const [attestorPdaResult] = findAttestorPDA(attestor.publicKey, context.program.programId);
+    attestorPda = attestorPdaResult;
 
-    const [policyPdaResult] = findPolicyPDA(
-      client.publicKey,
-      context.program.programId
-    );
+    const [policyPdaResult] = findPolicyPDA(client.publicKey, context.program.programId);
     policyPda = policyPdaResult;
 
-    // Register attester using helper function
-    await registerAttesterIfNotExists(
+    // Register attestor using helper function
+    await registerAttestorIfNotExists(
       context.program,
       context.authority.keypair,
-      attester.publicKey,
+      attestor.publicKey,
       context.registry.registryPda
     );
 
-    // Set policy ID for client using helper function
+    // Set policy for client using helper function
     try {
-      await setPolicyId(
+      await setPolicy(
         context.program,
         client,
-        testPolicy,
+        Buffer.from(testPolicy, "utf8"),
         context.registry.registryPda
       );
     } catch (error: any) {
@@ -82,16 +77,20 @@ describe("Validate Attestation", () => {
   });
 
   /**
-   * Helper function to create a statement
+   * Helper function to create a task
    */
-  function createStatement(uuid: Uint8Array, expiration: number) {
+  function createTask(uuid: Uint8Array, expiration: number) {
+    // Create policy buffer with exact length needed (200 bytes)
+    const policyBuffer = Buffer.alloc(200);
+    Buffer.from(testPolicy, "utf8").copy(policyBuffer);
+    
     return {
       uuid: Array.from(uuid),
       msgSender: client.publicKey,
       target: new PublicKey("11111111111111111111111111111111"),
       msgValue: new anchor.BN(1000000), // 1 SOL in lamports
       encodedSigAndArgs: Buffer.from("test-encoded-data"),
-      policyId: testPolicy,
+      policy: Array.from(policyBuffer),
       expiration: new anchor.BN(expiration),
     };
   }
@@ -99,21 +98,23 @@ describe("Validate Attestation", () => {
   /**
    * Helper function to create message hash matching Rust implementation
    */
-  function createMessageHash(
-    statement: any,
-    validatorPubkey: PublicKey
-  ): Buffer {
+  function createMessageHash(task: any, validatorPubkey: PublicKey): Buffer {
     // Create message hash exactly like the Rust implementation
-    // This matches the hash_statement_safe function in state.rs
-
+    // This matches the hash_task_safe function in state.rs
+    
+    // Get policy data - trim null bytes like get_policy() in Rust
+    const policyData = Buffer.from(task.policy);
+    const policyEnd = policyData.indexOf(0);
+    const trimmedPolicy = policyEnd === -1 ? policyData : policyData.subarray(0, policyEnd);
+    
     const data = Buffer.concat([
-      Buffer.from(statement.uuid),
-      statement.msgSender.toBuffer(),
+      Buffer.from(task.uuid),
+      task.msgSender.toBuffer(),
       validatorPubkey.toBuffer(), // validator key (equivalent to msg.sender in Solidity)
-      Buffer.from(statement.msgValue.toBuffer("le", 8)),
-      statement.encodedSigAndArgs,
-      Buffer.from(statement.policyId, "utf8"),
-      Buffer.from(statement.expiration.toBuffer("le", 8)),
+      Buffer.from(task.msgValue.toBuffer("le", 8)),
+      task.encodedSigAndArgs,
+      trimmedPolicy,
+      Buffer.from(task.expiration.toBuffer("le", 8)),
     ]);
 
     // Hash the data using SHA-256 (Solana's hash function)
@@ -123,33 +124,21 @@ describe("Validate Attestation", () => {
   /**
    * Helper function to create an Ed25519 signature matching Rust implementation
    */
-  function createSignature(
-    statement: any,
-    attesterKeypair: Keypair,
-    validatorPubkey: PublicKey
-  ): Uint8Array {
-    const messageHash = createMessageHash(statement, validatorPubkey);
-
+  function createSignature(task: any, attestorKeypair: Keypair, validatorPubkey: PublicKey): Uint8Array {
+    const messageHash = createMessageHash(task, validatorPubkey);
+    
     // Sign with Ed25519 using NaCl/TweetNaCl
-    const signature = nacl.sign.detached(
-      messageHash,
-      attesterKeypair.secretKey
-    );
+    const signature = nacl.sign.detached(messageHash, attestorKeypair.secretKey);
     return signature;
   }
 
   /**
    * Helper function to create an attestation
    */
-  function createAttestation(
-    uuid: Uint8Array,
-    attesterKeypair: Keypair,
-    expiration: number,
-    signature: Uint8Array
-  ) {
+  function createAttestation(uuid: Uint8Array, attestorKeypair: Keypair, expiration: number, signature: Uint8Array) {
     return {
       uuid: Array.from(uuid),
-      attester: attesterKeypair.publicKey,
+      attestor: attestorKeypair.publicKey,
       signature: Array.from(signature),
       expiration: new anchor.BN(expiration),
     };
@@ -159,37 +148,28 @@ describe("Validate Attestation", () => {
     it("should validate a correct attestation", async () => {
       const uuid = crypto.randomBytes(16);
       const expiration = getFutureTimestamp(3600); // 1 hour from now
-      const statement = createStatement(uuid, expiration);
-
+      const task = createTask(uuid, expiration);
+      
       // Create signature
-      const signature = createSignature(
-        statement,
-        attester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        uuid,
-        attester,
-        expiration,
-        signature
-      );
+      const signature = createSignature(task, attestor, validator.publicKey);
+      const attestation = createAttestation(uuid, attestor, expiration, signature);
 
       // Create message hash for Ed25519 verification instruction
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(task, validator.publicKey);
 
       // Create Ed25519 verification instruction
       const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-        publicKey: attester.publicKey.toBytes(),
+        publicKey: attestor.publicKey.toBytes(),
         message: messageHash,
         signature: signature,
       });
 
       // Create the validate attestation instruction
       const validateInstruction = await context.program.methods
-        .validateAttestation(statement, attester.publicKey, attestation)
+        .validateAttestation(task, attestor.publicKey, attestation)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           policyAccount: policyPda,
           validator: validator.publicKey,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
@@ -202,9 +182,7 @@ describe("Validate Attestation", () => {
       transaction.add(validateInstruction);
 
       // Send transaction
-      const result = await context.provider.sendAndConfirm(transaction, [
-        validator,
-      ]);
+      const result = await context.provider.sendAndConfirm(transaction, [validator]);
 
       expect(result).to.be.a("string");
     });
@@ -214,100 +192,77 @@ describe("Validate Attestation", () => {
     it("should fail with expired attestation", async () => {
       const uuid = crypto.randomBytes(16);
       const expiration = getPastTimestamp(3600); // 1 hour ago
-      const statement = createStatement(uuid, expiration);
-
-      const signature = createSignature(
-        statement,
-        attester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        uuid,
-        attester,
-        expiration,
-        signature
-      );
+      const task = createTask(uuid, expiration);
+      
+      const signature = createSignature(task, attestor, validator.publicKey);
+      const attestation = createAttestation(uuid, attestor, expiration, signature);
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(task, attestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error) {
         expectError(error, "AttestationExpired");
       }
     });
 
-    it("should fail with mismatched statement UUID", async () => {
-      const statementUuid = crypto.randomBytes(16);
+    it("should fail with mismatched task UUID", async () => {
+      const taskUuid = crypto.randomBytes(16);
       const attestationUuid = crypto.randomBytes(16);
       const expiration = getFutureTimestamp(3600);
-
-      const statement = createStatement(statementUuid, expiration);
-      const signature = createSignature(
-        statement,
-        attester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        attestationUuid,
-        attester,
-        expiration,
-        signature
-      );
+      
+      const task = createTask(taskUuid, expiration);
+      const signature = createSignature(task, attestor, validator.publicKey);
+      const attestation = createAttestation(attestationUuid, attestor, expiration, signature);
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(task, attestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error) {
-        expectError(error, "StatementIdMismatch");
+        expectError(error, "TaskIdMismatch");
       }
     });
 
     it("should fail with invalid signature", async () => {
       const uuid = crypto.randomBytes(16);
       const expiration = getFutureTimestamp(3600);
-      const statement = createStatement(uuid, expiration);
-
+      const task = createTask(uuid, expiration);
+      
       // Create invalid signature (random bytes)
       const invalidSignature = crypto.randomBytes(64);
-      const attestation = createAttestation(
-        uuid,
-        attester,
-        expiration,
-        invalidSignature
-      );
+      const attestation = createAttestation(uuid, attestor, expiration, invalidSignature);
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(task, attestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error: any) {
         // Check if it's an anchor error with the expected message
@@ -319,38 +274,29 @@ describe("Validate Attestation", () => {
       }
     });
 
-    it("should fail with wrong attester signature", async () => {
-      const wrongAttesterAccount = await createTestAccount(context.provider);
-      const wrongAttester = wrongAttesterAccount.keypair;
+    it("should fail with wrong attestor signature", async () => {
+      const wrongAttestorAccount = await createTestAccount(context.provider);
+      const wrongAttestor = wrongAttestorAccount.keypair;
       const uuid = crypto.randomBytes(16);
       const expiration = getFutureTimestamp(3600);
-      const statement = createStatement(uuid, expiration);
-
-      // Sign with wrong attester
-      const signature = createSignature(
-        statement,
-        wrongAttester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        uuid,
-        attester,
-        expiration,
-        signature
-      );
+      const task = createTask(uuid, expiration);
+      
+      // Sign with wrong attestor
+      const signature = createSignature(task, wrongAttestor, validator.publicKey);
+      const attestation = createAttestation(uuid, attestor, expiration, signature);
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(task, attestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error: any) {
         // Check if it's an anchor error with the expected message
@@ -361,88 +307,62 @@ describe("Validate Attestation", () => {
         expect(error).to.exist;
       }
     });
+
   });
 
   describe("Edge Cases", () => {
-    it("should fail with unregistered attester", async () => {
-      const unregisteredAttesterAccount = await createTestAccount(
-        context.provider
-      );
-      const unregisteredAttester = unregisteredAttesterAccount.keypair;
+    it("should fail with unregistered attestor", async () => {
+      const unregisteredAttestorAccount = await createTestAccount(context.provider);
+      const unregisteredAttestor = unregisteredAttestorAccount.keypair;
       const uuid = crypto.randomBytes(16);
       const expiration = getFutureTimestamp(3600);
-      const statement = createStatement(uuid, expiration);
+      const task = createTask(uuid, expiration);
+      
+      const signature = createSignature(task, unregisteredAttestor, validator.publicKey);
+      const attestation = createAttestation(uuid, unregisteredAttestor, expiration, signature);
 
-      const signature = createSignature(
-        statement,
-        unregisteredAttester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        uuid,
-        unregisteredAttester,
-        expiration,
-        signature
-      );
-
-      const [unregisteredAttesterPda] = findAttesterPDA(
-        unregisteredAttester.publicKey,
-        context.program.programId
-      );
+      const [unregisteredAttestorPda] = findAttestorPDA(unregisteredAttestor.publicKey, context.program.programId);
 
       try {
         await context.program.methods
-          .validateAttestation(
-            statement,
-            unregisteredAttester.publicKey,
-            attestation
-          )
+          .validateAttestation(task, unregisteredAttestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: unregisteredAttesterPda,
+            attestorAccount: unregisteredAttestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error: any) {
-        // Should fail because attester account doesn't exist
+        // Should fail because attestor account doesn't exist
         expect(error.message).to.include("AccountNotInitialized");
       }
     });
 
     it("should fail with mismatched expiration times", async () => {
       const uuid = crypto.randomBytes(16);
-      const statementExpiration = getFutureTimestamp(3600);
+      const taskExpiration = getFutureTimestamp(3600);
       const attestationExpiration = getFutureTimestamp(7200); // Different expiration
-
-      const statement = createStatement(uuid, statementExpiration);
-      const signature = createSignature(
-        statement,
-        attester,
-        validator.publicKey
-      );
-      const attestation = createAttestation(
-        uuid,
-        attester,
-        attestationExpiration,
-        signature
-      );
+      
+      const task = createTask(uuid, taskExpiration);
+      const signature = createSignature(task, attestor, validator.publicKey);
+      const attestation = createAttestation(uuid, attestor, attestationExpiration, signature);
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(task, attestor.publicKey, attestation)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             policyAccount: policyPda,
             validator: validator.publicKey,
           } as any)
           .signers([validator])
           .rpc();
-
+        
         expect.fail("Expected transaction to fail");
       } catch (error) {
         expectError(error, "ExpirationMismatch");

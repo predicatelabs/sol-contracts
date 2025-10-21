@@ -1,8 +1,8 @@
 import { expect } from "chai";
-import { SystemProgram } from "@solana/web3.js";
+import { Keypair, SystemProgram } from "@solana/web3.js";
 import {
   findPolicyPDA,
-  setPolicyId,
+  setPolicy,
   createFundedKeypair,
   createTestAccount,
 } from "./helpers/test-utils";
@@ -14,29 +14,29 @@ import {
 describe("Policy Management", () => {
   let context: SharedTestContext;
 
-  // Test policy IDs
-  const shortPolicyId = "x-short123456789";
-  const mediumPolicyId = "x-70742d552a93b03d"; // Typical format
-  const longPolicyId = "x-" + "a".repeat(62); // Maximum length (64 total)
-  const tooLongPolicyId = "x-" + "a".repeat(63); // Too long (65 total)
-  const updatedPolicyId = "x-updated-policy-id";
+  // Test policies
+  const shortPolicy = Buffer.from("short");
+  const mediumPolicy = Buffer.from("medium-length-policy-for-testing");
+  const longPolicy = Buffer.from("a".repeat(200)); // Maximum length
+  const tooLongPolicy = Buffer.from("a".repeat(201)); // Too long
+  const updatedPolicy = Buffer.from("updated-policy-content");
 
   before(async () => {
     context = await setupSharedTestContext();
   });
 
   describe("Policy Setting", () => {
-    it("Should set policy ID successfully", async () => {
+    it("Should set policy successfully", async () => {
       const client1 = await createTestAccount(context.provider);
       const [policyPda] = findPolicyPDA(
         client1.keypair.publicKey,
         context.program.programId
       );
 
-      const tx = await setPolicyId(
+      const tx = await setPolicy(
         context.program,
         client1.keypair,
-        mediumPolicyId,
+        mediumPolicy,
         context.registry.registryPda
       );
       expect(tx).to.be.a("string");
@@ -48,27 +48,33 @@ describe("Policy Management", () => {
       expect(policyAccount.client.toString()).to.equal(
         client1.keypair.publicKey.toString()
       );
-      expect(policyAccount.policyId).to.equal(mediumPolicyId);
+      expect(policyAccount.policyLen).to.equal(mediumPolicy.length);
       expect(policyAccount.setAt.toNumber()).to.be.greaterThan(0);
       expect(policyAccount.updatedAt.toNumber()).to.be.greaterThan(0);
       expect(policyAccount.setAt.toNumber()).to.equal(
         policyAccount.updatedAt.toNumber()
       );
+
+      // Verify policy content
+      const storedPolicy = Buffer.from(
+        policyAccount.policy.slice(0, policyAccount.policyLen)
+      );
+      expect(storedPolicy.equals(mediumPolicy)).to.be.true;
     });
 
-    it("Should set multiple policy IDs for different clients", async () => {
+    it("Should set multiple policies for different clients", async () => {
       const client1 = await createTestAccount(context.provider);
       const client2 = await createTestAccount(context.provider);
       const policies = [
-        { client: client1.keypair, policyId: shortPolicyId },
-        { client: client2.keypair, policyId: mediumPolicyId },
+        { client: client1.keypair, policy: shortPolicy },
+        { client: client2.keypair, policy: mediumPolicy },
       ];
 
-      for (const { client, policyId } of policies) {
-        await setPolicyId(
+      for (const { client, policy } of policies) {
+        await setPolicy(
           context.program,
           client,
-          policyId,
+          policy,
           context.registry.registryPda
         );
 
@@ -83,21 +89,26 @@ describe("Policy Management", () => {
         expect(policyAccount.client.toString()).to.equal(
           client.publicKey.toString()
         );
-        expect(policyAccount.policyId).to.equal(policyId);
+        expect(policyAccount.policyLen).to.equal(policy.length);
+
+        const storedPolicy = Buffer.from(
+          policyAccount.policy.slice(0, policyAccount.policyLen)
+        );
+        expect(storedPolicy.equals(policy)).to.be.true;
       }
     });
 
-    it("Should handle maximum length policy ID", async () => {
+    it("Should handle maximum length policy", async () => {
       const client1 = await createTestAccount(context.provider);
       const [policyPda] = findPolicyPDA(
         client1.keypair.publicKey,
         context.program.programId
       );
 
-      const tx = await setPolicyId(
+      const tx = await setPolicy(
         context.program,
         client1.keypair,
-        longPolicyId,
+        longPolicy,
         context.registry.registryPda
       );
       expect(tx).to.be.a("string");
@@ -105,22 +116,26 @@ describe("Policy Management", () => {
       const policyAccount = await context.program.account.policyAccount.fetch(
         policyPda
       );
-      expect(policyAccount.policyId).to.equal(longPolicyId);
-      expect(policyAccount.policyId.length).to.equal(64);
+      expect(policyAccount.policyLen).to.equal(200);
+
+      const storedPolicy = Buffer.from(
+        policyAccount.policy.slice(0, policyAccount.policyLen)
+      );
+      expect(storedPolicy.equals(longPolicy)).to.be.true;
     });
 
-    it("Should fail with policy ID too long", async () => {
+    it("Should fail with policy too long", async () => {
       const client1 = await createTestAccount(context.provider);
       try {
-        await setPolicyId(
+        await setPolicy(
           context.program,
           client1.keypair,
-          tooLongPolicyId,
+          tooLongPolicy,
           context.registry.registryPda
         );
         expect.fail("Should have thrown an error");
       } catch (error: any) {
-        expect(error.message).to.include("PolicyIdTooLong");
+        expect(error.message).to.include("PolicyTooLong");
       }
     });
 
@@ -134,7 +149,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .setPolicyId(mediumPolicyId)
+          .setPolicy(mediumPolicy)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -155,17 +170,17 @@ describe("Policy Management", () => {
     let client1: any;
 
     beforeEach(async () => {
-      // Create client and set initial policy ID
+      // Create client and set initial policy
       client1 = await createTestAccount(context.provider);
-      await setPolicyId(
+      await setPolicy(
         context.program,
         client1.keypair,
-        mediumPolicyId,
+        mediumPolicy,
         context.registry.registryPda
       );
     });
 
-    it("Should update policy ID successfully", async () => {
+    it("Should update policy successfully", async () => {
       const [policyPda] = findPolicyPDA(
         client1.keypair.publicKey,
         context.program.programId
@@ -176,7 +191,7 @@ describe("Policy Management", () => {
       const setAtBefore = policyBefore.setAt.toNumber();
 
       const tx = await context.program.methods
-        .updatePolicyId(updatedPolicyId)
+        .updatePolicy(updatedPolicy)
         .accounts({
           registry: context.registry.registryPda,
           policyAccount: policyPda,
@@ -187,12 +202,17 @@ describe("Policy Management", () => {
 
       expect(tx).to.be.a("string");
 
-      // Verify policy ID was updated
+      // Verify policy was updated
       const policyAfter = await context.program.account.policyAccount.fetch(
         policyPda
       );
-      expect(policyAfter.policyId).to.equal(updatedPolicyId);
+      expect(policyAfter.policyLen).to.equal(updatedPolicy.length);
       expect(policyAfter.setAt.toNumber()).to.equal(setAtBefore); // Should not change
+
+      const storedPolicy = Buffer.from(
+        policyAfter.policy.slice(0, policyAfter.policyLen)
+      );
+      expect(storedPolicy.equals(updatedPolicy)).to.be.true;
     });
 
     it("Should fail to update with unauthorized client", async () => {
@@ -204,7 +224,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .updatePolicyId(updatedPolicyId)
+          .updatePolicy(updatedPolicy)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -228,7 +248,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .updatePolicyId(updatedPolicyId)
+          .updatePolicy(updatedPolicy)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -245,37 +265,37 @@ describe("Policy Management", () => {
   });
 
   describe("Edge Cases", () => {
-    it("Should fail to set empty policy ID", async () => {
+    it("Should fail to set empty policy", async () => {
       const client1 = await createTestAccount(context.provider);
-      const emptyPolicyId = "";
+      const emptyPolicy = Buffer.from("");
 
       try {
-        await setPolicyId(
+        await setPolicy(
           context.program,
           client1.keypair,
-          emptyPolicyId,
+          emptyPolicy,
           context.registry.registryPda
         );
         expect.fail("Should have thrown an error");
       } catch (error: any) {
         expect(error.message).to.include(
-          "Invalid policy ID: Policy ID cannot be empty"
+          "Invalid policy: Policy cannot be empty"
         );
       }
     });
 
-    it("Should handle policy ID with valid special characters", async () => {
+    it("Should handle policy with special characters", async () => {
       const client1 = await createTestAccount(context.provider);
-      const specialPolicyId = "x-policy_id-with-dashes_underscores123";
+      const specialPolicy = Buffer.from("policy\x00\x01\x02\xFF");
       const [policyPda] = findPolicyPDA(
         client1.keypair.publicKey,
         context.program.programId
       );
 
-      const tx = await setPolicyId(
+      const tx = await setPolicy(
         context.program,
         client1.keypair,
-        specialPolicyId,
+        specialPolicy,
         context.registry.registryPda
       );
       expect(tx).to.be.a("string");
@@ -283,7 +303,10 @@ describe("Policy Management", () => {
       const policyAccount = await context.program.account.policyAccount.fetch(
         policyPda
       );
-      expect(policyAccount.policyId).to.equal(specialPolicyId);
+      const storedPolicy = Buffer.from(
+        policyAccount.policy.slice(0, policyAccount.policyLen)
+      );
+      expect(storedPolicy.equals(specialPolicy)).to.be.true;
     });
   });
 });

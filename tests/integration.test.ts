@@ -6,10 +6,11 @@ import {
 } from "./helpers/shared-setup";
 import {
   createTestAccount,
-  findAttesterPDA,
+  findAttestorPDA,
   findPolicyPDA,
-  registerAttester,
-  setPolicyId,
+  registerAttestor,
+  setPolicy,
+  updatePolicy,
 } from "./helpers/test-utils";
 
 describe("Integration Tests", () => {
@@ -17,8 +18,8 @@ describe("Integration Tests", () => {
   let newAuthority: Keypair;
   let client1: Keypair;
   let client2: Keypair;
-  let attester1: Keypair;
-  let attester2: Keypair;
+  let attestor1: Keypair;
+  let attestor2: Keypair;
 
   before(async () => {
     context = await setupSharedTestContext();
@@ -31,8 +32,8 @@ describe("Integration Tests", () => {
     newAuthority = newAuthorityAccount.keypair;
     client1 = client1Account.keypair;
     client2 = client2Account.keypair;
-    attester1 = Keypair.generate();
-    attester2 = Keypair.generate();
+    attestor1 = Keypair.generate();
+    attestor2 = Keypair.generate();
   });
 
   describe("Complete Registry Workflow", () => {
@@ -85,15 +86,15 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialAttesters = registryAccount.totalAttesters.toNumber();
+      const initialAttestors = registryAccount.totalAttestors.toNumber();
 
-      // 2. Register multiple attesters
-      const attesters = [attester1.publicKey, attester2.publicKey];
-      for (const attester of attesters) {
-        await registerAttester(
+      // 2. Register multiple attestors
+      const attestors = [attestor1.publicKey, attestor2.publicKey];
+      for (const attestor of attestors) {
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attester,
+          attestor,
           context.registry.registryPda
         );
       }
@@ -101,37 +102,37 @@ describe("Integration Tests", () => {
       registryAccount = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 2
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 2
       );
 
-      // 3. Set policy IDs for multiple clients
+      // 3. Set policies for multiple clients
       const policies = [
-        { client: client1, policyId: "x-client1-policy" },
-        { client: client2, policyId: "x-client2-policy" },
+        { client: client1, policy: Buffer.from("client1-policy") },
+        { client: client2, policy: Buffer.from("client2-policy") },
       ];
 
-      for (const { client, policyId } of policies) {
-        await setPolicyId(
+      for (const { client, policy } of policies) {
+        await setPolicy(
           context.program,
           client,
-          policyId,
+          policy,
           context.registry.registryPda
         );
       }
 
       // 4. Verify all accounts exist and have correct data
-      for (const attester of attesters) {
-        const [attesterPda] = findAttesterPDA(
-          attester,
+      for (const attestor of attestors) {
+        const [attestorPda] = findAttestorPDA(
+          attestor,
           context.program.programId
         );
-        const attesterAccount =
-          await context.program.account.attesterAccount.fetch(attesterPda);
-        expect(attesterAccount.isRegistered).to.be.true;
+        const attestorAccount =
+          await context.program.account.attestorAccount.fetch(attestorPda);
+        expect(attestorAccount.isRegistered).to.be.true;
       }
 
-      for (const { client, policyId } of policies) {
+      for (const { client, policy } of policies) {
         const [policyPda] = findPolicyPDA(
           client.publicKey,
           context.program.programId
@@ -139,7 +140,10 @@ describe("Integration Tests", () => {
         const policyAccount = await context.program.account.policyAccount.fetch(
           policyPda
         );
-        expect(policyAccount.policyId).to.equal(policyId);
+        const storedPolicy = Buffer.from(
+          policyAccount.policy.slice(0, policyAccount.policyLen)
+        );
+        expect(storedPolicy.equals(policy)).to.be.true;
       }
 
       // 5. Transfer authority
@@ -161,19 +165,19 @@ describe("Integration Tests", () => {
       );
 
       // 6. New authority can perform operations
-      const newAttester = Keypair.generate();
-      await registerAttester(
+      const newAttestor = Keypair.generate();
+      await registerAttestor(
         context.program,
         newAuthority,
-        newAttester.publicKey,
+        newAttestor.publicKey,
         context.registry.registryPda
       );
 
       registryAccount = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 3
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 3
       );
     });
 
@@ -183,7 +187,7 @@ describe("Integration Tests", () => {
           context.registry.registryPda
         );
       const createdAtBefore = registryBefore.createdAt.toNumber();
-      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
+      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
 
       // Transfer authority multiple times
       const authorities = [newAuthority, client2, context.authority.keypair];
@@ -209,27 +213,27 @@ describe("Integration Tests", () => {
           context.registry.registryPda
         );
       expect(registryAfter.createdAt.toNumber()).to.equal(createdAtBefore);
-      expect(registryAfter.totalAttesters.toNumber()).to.equal(
-        totalAttestersBefore
+      expect(registryAfter.totalAttestors.toNumber()).to.equal(
+        totalAttestorsBefore
       );
       expect(registryAfter.authority.toString()).to.equal(
         context.authority.keypair.publicKey.toString()
       );
 
       // Verify attestor accounts still exist and are correct
-      const [attestor1Pda] = findAttesterPDA(
-        attester1.publicKey,
+      const [attestor1Pda] = findAttestorPDA(
+        attestor1.publicKey,
         context.program.programId
       );
-      const [attestor2Pda] = findAttesterPDA(
-        attester2.publicKey,
+      const [attestor2Pda] = findAttestorPDA(
+        attestor2.publicKey,
         context.program.programId
       );
 
       const attestor1Account =
-        await context.program.account.attesterAccount.fetch(attestor1Pda);
+        await context.program.account.attestorAccount.fetch(attestor1Pda);
       const attestor2Account =
-        await context.program.account.attesterAccount.fetch(attestor2Pda);
+        await context.program.account.attestorAccount.fetch(attestor2Pda);
 
       expect(attestor1Account.isRegistered).to.be.true;
       expect(attestor2Account.isRegistered).to.be.true;
@@ -242,7 +246,10 @@ describe("Integration Tests", () => {
       const policyAccount = await context.program.account.policyAccount.fetch(
         policyPda
       );
-      expect(policyAccount.policyId).to.equal("x-client1-policy");
+      const storedPolicy = Buffer.from(
+        policyAccount.policy.slice(0, policyAccount.policyLen)
+      );
+      expect(storedPolicy.equals(Buffer.from("client1-policy"))).to.be.true;
     });
   });
 
@@ -293,7 +300,7 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
+      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
 
       // Transfer authority
       await context.program.methods
@@ -307,18 +314,18 @@ describe("Integration Tests", () => {
         .rpc();
 
       // Try to register with old authority (should fail)
-      const newAttester = Keypair.generate();
-      const [newAttesterPda] = findAttesterPDA(
-        newAttester.publicKey,
+      const newAttestor = Keypair.generate();
+      const [newAttestorPda] = findAttestorPDA(
+        newAttestor.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .registerAttester(newAttester.publicKey)
+          .registerAttestor(newAttestor.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: newAttesterPda,
+            attestorAccount: newAttestorPda,
             authority: context.authority.keypair.publicKey, // Old authority
             systemProgram: SystemProgram.programId,
           })
@@ -335,8 +342,8 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        totalAttestersBefore
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        totalAttestorsBefore
       );
       expect(registryAccount.authority.toString()).to.equal(
         newAuthority.publicKey.toString()
@@ -346,20 +353,20 @@ describe("Integration Tests", () => {
 
   describe("Concurrent Operations", () => {
     it("Should handle multiple attestor registrations correctly", async () => {
-      const attesters = Array.from({ length: 5 }, () => Keypair.generate());
+      const attestors = Array.from({ length: 5 }, () => Keypair.generate());
 
       const registryBefore =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialAttesters = registryBefore.totalAttesters.toNumber();
+      const initialAttestors = registryBefore.totalAttestors.toNumber();
 
       // Register all attestors
-      for (const attester of attesters) {
-        await registerAttester(
+      for (const attestor of attestors) {
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attester.publicKey,
+          attestor.publicKey,
           context.registry.registryPda
         );
       }
@@ -369,21 +376,21 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 5
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 5
       );
 
       // Verify each attestor account
-      for (const attester of attesters) {
-        const [attesterPda] = findAttesterPDA(
-          attester.publicKey,
+      for (const attestor of attestors) {
+        const [attestorPda] = findAttestorPDA(
+          attestor.publicKey,
           context.program.programId
         );
-        const attesterAccount =
-          await context.program.account.attesterAccount.fetch(attesterPda);
-        expect(attesterAccount.isRegistered).to.be.true;
-        expect(attesterAccount.attester.toString()).to.equal(
-          attester.publicKey.toString()
+        const attestorAccount =
+          await context.program.account.attestorAccount.fetch(attestorPda);
+        expect(attestorAccount.isRegistered).to.be.true;
+        expect(attestorAccount.attestor.toString()).to.equal(
+          attestor.publicKey.toString()
         );
       }
     });
@@ -397,13 +404,13 @@ describe("Integration Tests", () => {
         clients.push(clientAccount.keypair);
       }
 
-      // Set policy IDs for all clients
+      // Set policies for all clients
       for (let i = 0; i < clients.length; i++) {
-        const policyId = `x-policy-${i}`;
-        await setPolicyId(
+        const policy = Buffer.from(`policy-${i}`);
+        await setPolicy(
           context.program,
           clients[i],
-          policyId,
+          policy,
           context.registry.registryPda
         );
       }
@@ -414,10 +421,10 @@ describe("Integration Tests", () => {
           clients[i].publicKey,
           context.program.programId
         );
-        const updatedPolicyId = `x-updated-policy-${i}`;
+        const updatedPolicy = Buffer.from(`updated-policy-${i}`);
 
         await context.program.methods
-          .updatePolicyId(updatedPolicyId)
+          .updatePolicy(updatedPolicy)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -430,7 +437,10 @@ describe("Integration Tests", () => {
         const policyAccount = await context.program.account.policyAccount.fetch(
           policyPda
         );
-        expect(policyAccount.policyId).to.equal(updatedPolicyId);
+        const storedPolicy = Buffer.from(
+          policyAccount.policy.slice(0, policyAccount.policyLen)
+        );
+        expect(storedPolicy.equals(updatedPolicy)).to.be.true;
       }
     });
   });
@@ -482,46 +492,46 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialAttesters = registryBefore.totalAttesters.toNumber();
+      const initialAttestors = registryBefore.totalAttestors.toNumber();
 
       // Two new clients
       const client3 = await createTestAccount(context.provider);
       const client4 = await createTestAccount(context.provider);
 
       // Two new attestors
-      const attester3 = Keypair.generate();
-      const attester4 = Keypair.generate();
+      const attestor3 = Keypair.generate();
+      const attestor4 = Keypair.generate();
 
       const operations = [
         async () => {
-          await registerAttester(
+          await registerAttestor(
             context.program,
             context.authority.keypair,
-            attester3.publicKey,
+            attestor3.publicKey,
             context.registry.registryPda
           );
         },
         async () => {
-          await setPolicyId(
+          await setPolicy(
             context.program,
             client3.keypair,
-            "x-policy1",
+            Buffer.from("policy1"),
             context.registry.registryPda
           );
         },
         async () => {
-          await registerAttester(
+          await registerAttestor(
             context.program,
             context.authority.keypair,
-            attester4.publicKey,
+            attestor4.publicKey,
             context.registry.registryPda
           );
         },
         async () => {
-          await setPolicyId(
+          await setPolicy(
             context.program,
             client4.keypair,
-            "x-policy2",
+            Buffer.from("policy2"),
             context.registry.registryPda
           );
         },
@@ -531,7 +541,7 @@ describe("Integration Tests", () => {
             context.program.programId
           );
           await context.program.methods
-            .updatePolicyId("x-updated-policy1")
+            .updatePolicy(Buffer.from("updated-policy1"))
             .accounts({
               registry: context.registry.registryPda,
               policyAccount: policyPda,
@@ -552,27 +562,27 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 2
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 2
       );
 
       // Verify attestors
-      const [attester3Pda] = findAttesterPDA(
-        attester3.publicKey,
+      const [attestor3Pda] = findAttestorPDA(
+        attestor3.publicKey,
         context.program.programId
       );
-      const [attester4Pda] = findAttesterPDA(
-        attester4.publicKey,
+      const [attestor4Pda] = findAttestorPDA(
+        attestor4.publicKey,
         context.program.programId
       );
 
-      const attester3Account =
-        await context.program.account.attesterAccount.fetch(attester3Pda);
-      const attester4Account =
-        await context.program.account.attesterAccount.fetch(attester4Pda);
+      const attestor3Account =
+        await context.program.account.attestorAccount.fetch(attestor3Pda);
+      const attestor4Account =
+        await context.program.account.attestorAccount.fetch(attestor4Pda);
 
-      expect(attester3Account.isRegistered).to.be.true;
-      expect(attester4Account.isRegistered).to.be.true;
+      expect(attestor3Account.isRegistered).to.be.true;
+      expect(attestor4Account.isRegistered).to.be.true;
 
       // Verify policies
       const [policy1Pda] = findPolicyPDA(
@@ -591,8 +601,15 @@ describe("Integration Tests", () => {
         policy2Pda
       );
 
-      expect(policy1Account.policyId).to.equal("x-updated-policy1");
-      expect(policy2Account.policyId).to.equal("x-policy2");
+      const storedPolicy1 = Buffer.from(
+        policy1Account.policy.slice(0, policy1Account.policyLen)
+      );
+      const storedPolicy2 = Buffer.from(
+        policy2Account.policy.slice(0, policy2Account.policyLen)
+      );
+
+      expect(storedPolicy1.equals(Buffer.from("updated-policy1"))).to.be.true;
+      expect(storedPolicy2.equals(Buffer.from("policy2"))).to.be.true;
     });
 
     it("Should handle registry statistics correctly across all operations", async () => {
@@ -601,19 +618,19 @@ describe("Integration Tests", () => {
           context.registry.registryPda
         );
       const initialUpdatedAt = registryAccount.updatedAt.toNumber();
-      const initialAttesters = registryAccount.totalAttesters.toNumber();
+      const initialAttestors = registryAccount.totalAttestors.toNumber();
 
       // Two new attestors
-      const attester3 = Keypair.generate();
-      const attester4 = Keypair.generate();
+      const attestor3 = Keypair.generate();
+      const attestor4 = Keypair.generate();
 
       // Register 3 attestors
-      const attesters = [attester3, attester4, Keypair.generate()];
-      for (const attester of attesters) {
-        await registerAttester(
+      const attestors = [attestor3, attestor4, Keypair.generate()];
+      for (const attestor of attestors) {
+        await registerAttestor(
           context.program,
           context.authority.keypair,
-          attester.publicKey,
+          attestor.publicKey,
           context.registry.registryPda
         );
       }
@@ -621,23 +638,23 @@ describe("Integration Tests", () => {
       registryAccount = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 3
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 3
       );
       expect(registryAccount.updatedAt.toNumber()).to.be.greaterThan(
         initialUpdatedAt
       );
 
       // Deregister 1 attestor
-      const [attesterPda] = findAttesterPDA(
-        attester3.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        attestor3.publicKey,
         context.program.programId
       );
       await context.program.methods
-        .deregisterAttester(attester3.publicKey)
+        .deregisterAttestor(attestor3.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: attesterPda,
+          attestorAccount: attestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
@@ -646,8 +663,8 @@ describe("Integration Tests", () => {
       registryAccount = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 2
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 2
       );
 
       // Transfer authority (should update timestamp but not counts)
@@ -666,8 +683,8 @@ describe("Integration Tests", () => {
       registryAccount = await context.program.account.predicateRegistry.fetch(
         context.registry.registryPda
       );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 2
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 2
       ); // Should not change
     });
   });
@@ -719,31 +736,31 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const initialAttesters = registryBefore.totalAttesters.toNumber();
+      const initialAttestors = registryBefore.totalAttestors.toNumber();
 
       // New attestor
-      const newAttester = Keypair.generate();
+      const newAttestor = Keypair.generate();
 
       // Register attestor successfully
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        newAttester.publicKey,
+        newAttestor.publicKey,
         context.registry.registryPda
       );
 
       // Try to register same attestor again (should fail)
-      const [attesterPda] = findAttesterPDA(
-        newAttester.publicKey,
+      const [attestorPda] = findAttestorPDA(
+        newAttestor.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .registerAttester(newAttester.publicKey)
+          .registerAttestor(newAttestor.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attesterAccount: attesterPda,
+            attestorAccount: attestorPda,
             authority: context.authority.keypair.publicKey,
             systemProgram: SystemProgram.programId,
           })
@@ -760,15 +777,15 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 1
+      expect(registryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 1
       );
 
       // New attestor should be registered
       const secondAttestor = Keypair.generate();
 
       // Should be able to register different attestor
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
         secondAttestor.publicKey,
@@ -779,8 +796,8 @@ describe("Integration Tests", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(updatedRegistryAccount.totalAttesters.toNumber()).to.equal(
-        initialAttesters + 2
+      expect(updatedRegistryAccount.totalAttestors.toNumber()).to.equal(
+        initialAttestors + 2
       );
     });
   });
@@ -795,10 +812,10 @@ describe("Integration Tests", () => {
         context.program.programId
       );
 
-      const maxPolicyId = "x-" + "A".repeat(62); // Exactly 64 characters
+      const maxPolicy = Buffer.alloc(200, 'A'); // Exactly 200 'A' characters
 
       await context.program.methods
-        .setPolicyId(maxPolicyId)
+        .setPolicy(Buffer.from(maxPolicy))
         .accounts({
           registry: context.registry.registryPda,
           policyAccount: maxPolicyPda,
@@ -811,32 +828,31 @@ describe("Integration Tests", () => {
       const policyAccount = await context.program.account.policyAccount.fetch(
         maxPolicyPda
       );
-      expect(policyAccount.policyId).to.equal(maxPolicyId);
-      expect(policyAccount.policyId.length).to.equal(64);
+      expect(policyAccount.policyLen).to.equal(200);
     });
 
     it("Should handle re-registration of deregistered attestor", async () => {
       // Create a fresh attestor for this test to avoid account conflicts
-      const freshAttester = Keypair.generate();
-      const [freshAttesterPda] = findAttesterPDA(
-        freshAttester.publicKey,
+      const freshAttestor = Keypair.generate();
+      const [freshAttestorPda] = findAttestorPDA(
+        freshAttestor.publicKey,
         context.program.programId
       );
 
       // Register the fresh attestor
-      await registerAttester(
+      await registerAttestor(
         context.program,
         context.authority.keypair,
-        freshAttester.publicKey,
+        freshAttestor.publicKey,
         context.registry.registryPda
       );
 
       // Deregister the attestor
       await context.program.methods
-        .deregisterAttester(freshAttester.publicKey)
+        .deregisterAttestor(freshAttestor.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attesterAccount: freshAttesterPda,
+          attestorAccount: freshAttestorPda,
           authority: context.authority.keypair.publicKey,
         })
         .signers([context.authority.keypair])
@@ -844,13 +860,13 @@ describe("Integration Tests", () => {
 
       // Verify it's deregistered
       const deregisteredAccount =
-        await context.program.account.attesterAccount.fetch(freshAttesterPda);
+        await context.program.account.attestorAccount.fetch(freshAttestorPda);
       expect(deregisteredAccount.isRegistered).to.be.false;
 
       // For now, re-registration of an existing account is not supported
       // This test verifies that deregistration works correctly
-      expect(deregisteredAccount.attester.toString()).to.equal(
-        freshAttester.publicKey.toString()
+      expect(deregisteredAccount.attestor.toString()).to.equal(
+        freshAttestor.publicKey.toString()
       );
     });
 
@@ -861,7 +877,7 @@ describe("Integration Tests", () => {
         );
 
       // Count should be at least 0 (depending on previous tests)
-      expect(registryAccount.totalAttesters.toNumber()).to.be.at.least(0);
+      expect(registryAccount.totalAttestors.toNumber()).to.be.at.least(0);
 
       // Policies counter may not be implemented in the smart contract
       expect(registryAccount.totalPolicies.toNumber()).to.be.at.least(0);

@@ -14,19 +14,19 @@ pub enum CounterError {
     /// The caller is not authorized to perform this operation
     /// 
     /// This error occurs when:
-    /// - The statement msg_sender doesn't match the counter owner
+    /// - The task msg_sender doesn't match the counter owner
     /// - An unauthorized account tries to perform protected operations
     #[msg("Unauthorized operation")]
     Unauthorized,
 
-    /// The provided statement parameters are invalid
+    /// The provided task parameters are invalid
     /// 
     /// This error occurs when:
-    /// - Statement target doesn't match the counter program ID
-    /// - Statement encoded signature doesn't match expected increment signature
-    /// - Statement UUID or other parameters are malformed
-    #[msg("Invalid statement parameters")]
-    InvalidStatement,
+    /// - Task target doesn't match the counter program ID
+    /// - Task encoded signature doesn't match expected increment signature
+    /// - Task UUID or other parameters are malformed
+    #[msg("Invalid task parameters")]
+    InvalidTask,
 
     /// An arithmetic operation failed (overflow, underflow, etc.)
     /// 
@@ -61,13 +61,13 @@ pub enum CounterError {
     #[msg("Invalid policy configuration")]
     InvalidPolicyConfig,
 
-    /// The attester account is not properly configured
+    /// The attestor account is not properly configured
     /// 
     /// This error occurs when:
-    /// - Attester account doesn't exist or is not registered
-    /// - Attester account is corrupted or invalid
-    #[msg("Invalid attester configuration")]
-    InvalidAttesterConfig,
+    /// - Attestor account doesn't exist or is not registered
+    /// - Attestor account is corrupted or invalid
+    #[msg("Invalid attestor configuration")]
+    InvalidAttestorConfig,
 
     /// General validation failure from predicate registry
     /// 

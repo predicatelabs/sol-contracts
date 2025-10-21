@@ -10,22 +10,22 @@ This directory contains test keypairs for development and testing purposes.
 - **Usage**: Use this as the authority for initializing the predicate registry
 - **Environment Variable**: `export ANCHOR_WALLET=scripts/test-keys/authority.json`
 
-## Attester Keys
+## Attestor Keys
 
-### attester-1
+### attestor-1
 - **Public Key**: `6b1PX55tY4B2MzrG53e6a8mX3CGkhLuDZs9LdVHQ3L44`
-- **File**: `attester-1.json`
-- **Register Command**: `export ATTESTER_PUBKEY=6b1PX55tY4B2MzrG53e6a8mX3CGkhLuDZs9LdVHQ3L44 && npx ts-node scripts/register-attester.ts`
+- **File**: `attestor-1.json`
+- **Register Command**: `export ATTESTOR_PUBKEY=6b1PX55tY4B2MzrG53e6a8mX3CGkhLuDZs9LdVHQ3L44 && npx ts-node scripts/register-attestor.ts`
 
-### attester-2
+### attestor-2
 - **Public Key**: `H6VsoAJjTFGk2bXaNGpojHri1Ud1zmZuoo4A9Bdkp2UC`
-- **File**: `attester-2.json`
-- **Register Command**: `export ATTESTER_PUBKEY=H6VsoAJjTFGk2bXaNGpojHri1Ud1zmZuoo4A9Bdkp2UC && npx ts-node scripts/register-attester.ts`
+- **File**: `attestor-2.json`
+- **Register Command**: `export ATTESTOR_PUBKEY=H6VsoAJjTFGk2bXaNGpojHri1Ud1zmZuoo4A9Bdkp2UC && npx ts-node scripts/register-attestor.ts`
 
-### attester-3
+### attestor-3
 - **Public Key**: `JAJtV17DAwynd8DvUVsk2HnarazKm1P1yZ4rSpodZBay`
-- **File**: `attester-3.json`
-- **Register Command**: `export ATTESTER_PUBKEY=JAJtV17DAwynd8DvUVsk2HnarazKm1P1yZ4rSpodZBay && npx ts-node scripts/register-attester.ts`
+- **File**: `attestor-3.json`
+- **Register Command**: `export ATTESTOR_PUBKEY=JAJtV17DAwynd8DvUVsk2HnarazKm1P1yZ4rSpodZBay && npx ts-node scripts/register-attestor.ts`
 
 ## Usage Examples
 
@@ -37,12 +37,12 @@ export ANCHOR_WALLET=scripts/test-keys/authority.json
 npx ts-node scripts/initialize-predicate-registry.ts
 ```
 
-### Registering Attesters
+### Registering Attestors
 
 ```bash
-# Choose one of the attesters above and set the environment variable
-export ATTESTER_PUBKEY=<public-key-from-above>
-npx ts-node scripts/register-attester.ts
+# Choose one of the attestors above and set the environment variable
+export ATTESTOR_PUBKEY=<public-key-from-above>
+npx ts-node scripts/register-attestor.ts
 ```
 
 ## Security Notice

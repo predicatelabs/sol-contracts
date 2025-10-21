@@ -2,10 +2,10 @@
 
 /**
  * Initialize Counter Program Script
- *
+ * 
  * This script initializes a counter program instance using the deployment keys
  * from the machine that deployed the program. It will:
- *
+ * 
  * 1. Load the program keypair from target/deploy/
  * 2. Use the configured wallet as the owner
  * 3. Ensure predicate registry is initialized
@@ -16,7 +16,12 @@
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, SystemProgram, Connection } from "@solana/web3.js";
+import { 
+  Keypair, 
+  PublicKey, 
+  SystemProgram,
+  Connection
+} from "@solana/web3.js";
 import { PredicateRegistry } from "../target/types/predicate_registry";
 import { Counter } from "../target/types/counter";
 import * as fs from "fs";
@@ -24,9 +29,7 @@ import * as path from "path";
 
 // Configuration
 const CLUSTER_URL = process.env.ANCHOR_PROVIDER_URL || "http://127.0.0.1:8899";
-const WALLET_PATH =
-  process.env.ANCHOR_WALLET ||
-  path.join(__dirname, "test-keys", "authority.json");
+const WALLET_PATH = process.env.ANCHOR_WALLET || path.join(__dirname, "test-keys", "authority.json");
 const DEFAULT_POLICY = "counter-increment-policy-v1";
 const USE_TEST_KEYS = process.env.USE_TEST_KEYS !== "false"; // Default to true
 
@@ -45,20 +48,20 @@ interface CounterInitializationResult {
  */
 async function loadOwnerKeypair(connection: Connection): Promise<Keypair> {
   let walletPath = WALLET_PATH;
-
+  
   // Handle tilde expansion
   if (walletPath.startsWith("~/")) {
     walletPath = path.join(process.env.HOME || "", walletPath.slice(2));
   }
-
+  
   // Check if using test keys
   const isUsingTestKeys = walletPath.includes("test-keys");
-
+  
   let keypair: Keypair;
   try {
     const keypairData = JSON.parse(fs.readFileSync(walletPath, "utf8"));
     keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
-
+    
     if (isUsingTestKeys) {
       console.log("🔑 Using test authority key from test-keys/authority.json");
       console.log("⚠️  This is for development/testing only!");
@@ -67,66 +70,51 @@ async function loadOwnerKeypair(connection: Connection): Promise<Keypair> {
     if (isUsingTestKeys) {
       throw new Error(
         `Failed to load test authority keypair from ${walletPath}. ` +
-          `Please run 'npx ts-node --transpile-only scripts/generate-test-keys.ts' first.`
+        `Please run 'npx ts-node --transpile-only scripts/generate-test-keys.ts' first.`
       );
     }
-    throw new Error(
-      `Failed to load owner keypair from ${walletPath}: ${error}`
-    );
+    throw new Error(`Failed to load owner keypair from ${walletPath}: ${error}`);
   }
-
+  
   // Check balance and request airdrop if needed
   const balance = await connection.getBalance(keypair.publicKey);
   const minBalance = 0.1 * anchor.web3.LAMPORTS_PER_SOL; // 0.1 SOL minimum
-
-  console.log(
-    `💰 Current balance: ${balance / anchor.web3.LAMPORTS_PER_SOL} SOL`
-  );
-
+  
+  console.log(`💰 Current balance: ${balance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+  
   if (balance < minBalance) {
     console.log("💸 Balance is low, requesting airdrop...");
-
+    
     try {
       // Check if we're on a network that supports airdrops
-      const isLocalOrDevnet =
-        CLUSTER_URL.includes("127.0.0.1") ||
-        CLUSTER_URL.includes("localhost") ||
-        CLUSTER_URL.includes("devnet");
-
+      const isLocalOrDevnet = CLUSTER_URL.includes("127.0.0.1") || 
+                             CLUSTER_URL.includes("localhost") || 
+                             CLUSTER_URL.includes("devnet");
+      
       if (isLocalOrDevnet) {
         const signature = await connection.requestAirdrop(
           keypair.publicKey,
           2 * anchor.web3.LAMPORTS_PER_SOL // Request 2 SOL
         );
-
+        
         console.log(`   Airdrop requested: ${signature}`);
         console.log("   Waiting for confirmation...");
-
+        
         await connection.confirmTransaction(signature);
-
+        
         const newBalance = await connection.getBalance(keypair.publicKey);
-        console.log(
-          `✅ Airdrop successful! New balance: ${
-            newBalance / anchor.web3.LAMPORTS_PER_SOL
-          } SOL`
-        );
+        console.log(`✅ Airdrop successful! New balance: ${newBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
       } else {
-        console.log(
-          "⚠️  Cannot request airdrop on this network. Please fund the account manually."
-        );
+        console.log("⚠️  Cannot request airdrop on this network. Please fund the account manually.");
         console.log(`   Account: ${keypair.publicKey.toString()}`);
-        console.log(
-          `   Required: At least ${
-            minBalance / anchor.web3.LAMPORTS_PER_SOL
-          } SOL`
-        );
+        console.log(`   Required: At least ${minBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
       }
     } catch (error) {
       console.log(`⚠️  Airdrop failed: ${error}`);
       console.log("   Continuing with current balance...");
     }
   }
-
+  
   return keypair;
 }
 
@@ -141,10 +129,10 @@ async function setupClients(): Promise<{
 }> {
   // Setup connection first
   const connection = new Connection(CLUSTER_URL, "confirmed");
-
+  
   // Load owner keypair and ensure it's funded
   const owner = await loadOwnerKeypair(connection);
-
+  
   // Setup provider
   const wallet = new anchor.Wallet(owner);
   const provider = new anchor.AnchorProvider(connection, wallet, {
@@ -153,15 +141,12 @@ async function setupClients(): Promise<{
   anchor.setProvider(provider);
 
   // Load programs
-  const predicateProgram = anchor.workspace
-    .PredicateRegistry as Program<PredicateRegistry>;
+  const predicateProgram = anchor.workspace.PredicateRegistry as Program<PredicateRegistry>;
   const counterProgram = anchor.workspace.Counter as Program<Counter>;
 
   console.log("✅ Clients setup complete:");
   console.log(`   Cluster: ${CLUSTER_URL}`);
-  console.log(
-    `   Predicate Registry: ${predicateProgram.programId.toString()}`
-  );
+  console.log(`   Predicate Registry: ${predicateProgram.programId.toString()}`);
   console.log(`   Counter Program: ${counterProgram.programId.toString()}`);
   console.log(`   Owner: ${owner.publicKey.toString()}`);
 
@@ -249,17 +234,19 @@ async function checkPolicyExists(
 /**
  * Set policy for the counter owner
  */
-async function setPolicyId(
+async function setPolicy(
   predicateProgram: Program<PredicateRegistry>,
   owner: Keypair,
   registryPda: PublicKey,
   policyPda: PublicKey,
   policy: string = DEFAULT_POLICY
 ): Promise<string> {
-  console.log(`📝 Setting policy ID for owner: ${policy}`);
-
+  console.log(`📝 Setting policy for owner: ${policy}`);
+  
+  const policyBuffer = Buffer.from(policy, "utf8");
+  
   const tx = await predicateProgram.methods
-    .setPolicyId(policy)
+    .setPolicy(policyBuffer)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
@@ -299,7 +286,7 @@ async function initializeCounter(
   policyPda: PublicKey
 ): Promise<string> {
   console.log("📝 Initializing counter...");
-
+  
   const tx = await counterProgram.methods
     .initialize()
     .accounts({
@@ -324,27 +311,15 @@ async function displayCounterInfo(
   counterPda: PublicKey
 ): Promise<void> {
   try {
-    const counterAccount = await counterProgram.account.counterAccount.fetch(
-      counterPda
-    );
-
+    const counterAccount = await counterProgram.account.counterAccount.fetch(counterPda);
+    
     console.log("\n📊 Counter Information:");
     console.log(`   Counter PDA: ${counterPda.toString()}`);
     console.log(`   Owner: ${counterAccount.owner.toString()}`);
     console.log(`   Current Value: ${counterAccount.value.toNumber()}`);
-    console.log(
-      `   Predicate Registry: ${counterAccount.predicateRegistry.toString()}`
-    );
-    console.log(
-      `   Created At: ${new Date(
-        counterAccount.createdAt.toNumber() * 1000
-      ).toISOString()}`
-    );
-    console.log(
-      `   Updated At: ${new Date(
-        counterAccount.updatedAt.toNumber() * 1000
-      ).toISOString()}`
-    );
+    console.log(`   Predicate Registry: ${counterAccount.predicateRegistry.toString()}`);
+    console.log(`   Created At: ${new Date(counterAccount.createdAt.toNumber() * 1000).toISOString()}`);
+    console.log(`   Updated At: ${new Date(counterAccount.updatedAt.toNumber() * 1000).toISOString()}`);
   } catch (error) {
     console.error("❌ Failed to fetch counter information:", error);
   }
@@ -355,12 +330,11 @@ async function displayCounterInfo(
  */
 async function main(): Promise<CounterInitializationResult> {
   console.log("🚀 Counter Program Initialization Script");
-  console.log("=".repeat(50));
+  console.log("=" .repeat(50));
 
   try {
     // Setup clients
-    const { predicateProgram, counterProgram, provider, owner } =
-      await setupClients();
+    const { predicateProgram, counterProgram, provider, owner } = await setupClients();
 
     // Find PDAs
     const pdas = findPDAs(predicateProgram, counterProgram, owner.publicKey);
@@ -368,10 +342,7 @@ async function main(): Promise<CounterInitializationResult> {
     console.log("\n🔍 Checking prerequisites...");
 
     // Check if predicate registry exists
-    const registryExists = await checkRegistryExists(
-      predicateProgram,
-      pdas.registryPda
-    );
+    const registryExists = await checkRegistryExists(predicateProgram, pdas.registryPda);
     if (!registryExists) {
       throw new Error(
         "Predicate registry is not initialized. Please run initialize-predicate-registry.ts first."
@@ -380,13 +351,10 @@ async function main(): Promise<CounterInitializationResult> {
     console.log("✅ Predicate registry is initialized");
 
     // Check if policy exists, set if not
-    const policyExists = await checkPolicyExists(
-      predicateProgram,
-      pdas.policyPda
-    );
+    const policyExists = await checkPolicyExists(predicateProgram, pdas.policyPda);
     if (!policyExists) {
       console.log("📝 Policy not found, setting default policy...");
-      const policyTx = await setPolicyId(
+      const policyTx = await setPolicy(
         predicateProgram,
         owner,
         pdas.registryPda,
@@ -398,11 +366,8 @@ async function main(): Promise<CounterInitializationResult> {
     }
 
     // Check if counter already exists
-    const counterExists = await checkCounterExists(
-      counterProgram,
-      pdas.counterPda
-    );
-
+    const counterExists = await checkCounterExists(counterProgram, pdas.counterPda);
+    
     let transactionSignature: string | undefined;
     let alreadyInitialized = false;
 
@@ -426,15 +391,13 @@ async function main(): Promise<CounterInitializationResult> {
     // Display counter information
     await displayCounterInfo(counterProgram, pdas.counterPda);
 
-    console.log("\n" + "=".repeat(50));
+    console.log("\n" + "=" .repeat(50));
     console.log("✅ Counter initialization completed successfully!");
-
+    
     if (!alreadyInitialized) {
       console.log("\n🎉 Next steps:");
-      console.log("   1. Register attesters with the predicate registry");
-      console.log(
-        "   2. Use the counter client to perform protected increment operations"
-      );
+      console.log("   1. Register attestors with the predicate registry");
+      console.log("   2. Use the counter client to perform protected increment operations");
       console.log("   3. Test the predicate validation flow");
     }
 
@@ -447,6 +410,7 @@ async function main(): Promise<CounterInitializationResult> {
       transactionSignature,
       alreadyInitialized,
     };
+
   } catch (error) {
     console.error("❌ Error:", error);
     process.exit(1);

@@ -10,22 +10,20 @@ use crate::errors::PredicateRegistryError;
 
 // Import all instruction modules
 pub mod initialize;
-pub mod register_attester;
-pub mod deregister_attester;
-pub mod set_policy_id;
-pub mod update_policy_id;
+pub mod register_attestor;
+pub mod deregister_attestor;
+pub mod set_policy;
+pub mod update_policy;
 pub mod validate_attestation;
-pub mod cleanup_expired_uuid;
 pub mod transfer_authority;
 
 // Re-export instruction functions
 pub use initialize::*;
-pub use register_attester::*;
-pub use deregister_attester::*;
-pub use set_policy_id::*;
-pub use update_policy_id::*;
+pub use register_attestor::*;
+pub use deregister_attestor::*;
+pub use set_policy::*;
+pub use update_policy::*;
 pub use validate_attestation::*;
-pub use cleanup_expired_uuid::*;
 pub use transfer_authority::*;
 
 /// Account validation context for initializing a new registry
@@ -49,10 +47,10 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Account validation context for registering an attester
+/// Account validation context for registering an attestor
 #[derive(Accounts)]
-#[instruction(attester: Pubkey)]
-pub struct RegisterAttester<'info> {
+#[instruction(attestor: Pubkey)]
+pub struct RegisterAttestor<'info> {
     /// The registry account
     #[account(
         mut,
@@ -62,15 +60,15 @@ pub struct RegisterAttester<'info> {
     )]
     pub registry: Account<'info, PredicateRegistry>,
     
-    /// The attester account to be created
+    /// The attestor account to be created
     #[account(
         init,
         payer = authority,
-        space = 8 + AttesterAccount::INIT_SPACE,
-        seeds = [b"attester", attester.as_ref()],
+        space = 8 + AttestorAccount::INIT_SPACE,
+        seeds = [b"attestor", attestor.as_ref()],
         bump
     )]
-    pub attester_account: Account<'info, AttesterAccount>,
+    pub attestor_account: Account<'info, AttestorAccount>,
     
     /// The registry authority
     #[account(mut)]
@@ -80,10 +78,10 @@ pub struct RegisterAttester<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Account validation context for deregistering an attester
+/// Account validation context for deregistering an attestor
 #[derive(Accounts)]
-#[instruction(attester: Pubkey)]
-pub struct DeregisterAttester<'info> {
+#[instruction(attestor: Pubkey)]
+pub struct DeregisterAttestor<'info> {
     /// The registry account
     #[account(
         mut,
@@ -93,22 +91,22 @@ pub struct DeregisterAttester<'info> {
     )]
     pub registry: Account<'info, PredicateRegistry>,
     
-    /// The attester account to be deregistered
+    /// The attestor account to be deregistered
     #[account(
         mut,
-        seeds = [b"attester", attester.as_ref()],
+        seeds = [b"attestor", attestor.as_ref()],
         bump,
-        constraint = attester_account.is_registered @ PredicateRegistryError::AttesterNotRegistered
+        constraint = attestor_account.is_registered @ PredicateRegistryError::AttestorNotRegistered
     )]
-    pub attester_account: Account<'info, AttesterAccount>,
+    pub attestor_account: Account<'info, AttestorAccount>,
     
     /// The registry authority
     pub authority: Signer<'info>,
 }
 
-/// Account validation context for setting a policy ID
+/// Account validation context for setting a policy
 #[derive(Accounts)]
-pub struct SetPolicyId<'info> {
+pub struct SetPolicy<'info> {
     /// The registry account (for event emission)
     #[account(
         seeds = [b"predicate_registry"],
@@ -134,9 +132,9 @@ pub struct SetPolicyId<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Account validation context for updating a policy ID
+/// Account validation context for updating a policy
 #[derive(Accounts)]
-pub struct UpdatePolicyId<'info> {
+pub struct UpdatePolicy<'info> {
     /// The registry account (for event emission)
     #[account(
         seeds = [b"predicate_registry"],
@@ -159,7 +157,7 @@ pub struct UpdatePolicyId<'info> {
 
 /// Account validation context for validating an attestation
 #[derive(Accounts)]
-#[instruction(statement: Statement, attester_key: Pubkey)]
+#[instruction(task: Task, attestor_key: Pubkey)]
 pub struct ValidateAttestation<'info> {    
     /// The registry account
     #[account(
@@ -168,39 +166,24 @@ pub struct ValidateAttestation<'info> {
         bump
     )]
     pub registry: Account<'info, PredicateRegistry>,
-    /// The attester account that made the attestation
+    /// The attestor account that made the attestation
     #[account(
         mut,
-        seeds = [b"attester", attester_key.as_ref()],
+        seeds = [b"attestor", attestor_key.as_ref()],
         bump,
-        constraint = attester_account.is_registered @ PredicateRegistryError::AttesterNotRegisteredForValidation
+        constraint = attestor_account.is_registered @ PredicateRegistryError::AttestorNotRegisteredForValidation
     )]
-    pub attester_account: Account<'info, AttesterAccount>,
+    pub attestor_account: Account<'info, AttestorAccount>,
     
     /// The policy account for the client
     #[account(
-        seeds = [b"policy", statement.msg_sender.as_ref()],
+        seeds = [b"policy", task.msg_sender.as_ref()],
         bump
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
-    /// The used UUID account (replay protection)
-    /// Must be created for first use, will fail if already exists
-    #[account(
-        init,
-        payer = validator,
-        space = 8 + UsedUuidAccount::INIT_SPACE,
-        seeds = [b"used_uuid", statement.uuid.as_ref()],
-        bump
-    )]
-    pub used_uuid_account: Account<'info, UsedUuidAccount>,
-    
-    /// The validator calling this instruction (also payer for UUID account)
-    #[account(mut)]
+    /// The validator calling this instruction
     pub validator: Signer<'info>,
-    
-    /// System program for account creation
-    pub system_program: Program<'info, System>,
     
     /// Instructions sysvar for signature verification
     /// CHECK: This is the instructions sysvar account
@@ -226,24 +209,6 @@ pub struct TransferAuthority<'info> {
     /// The new authority (must be a valid account)
     /// CHECK: This is safe because we only store the pubkey
     pub new_authority: AccountInfo<'info>,
-}
-
-/// Account validation context for cleaning up expired UUIDs
-#[derive(Accounts)]
-pub struct CleanupExpiredUuid<'info> {
-    /// The used UUID account to be cleaned up (closed)
-    #[account(
-        mut,
-        close = validator_recipient,
-        seeds = [b"used_uuid", &used_uuid_account.uuid],
-        bump
-    )]
-    pub used_uuid_account: Account<'info, UsedUuidAccount>,
-    
-    /// The original validator (payer) who will receive the rent refund
-    /// CHECK: This is the account that originally paid for the UUID account
-    #[account(mut)]
-    pub validator_recipient: AccountInfo<'info>,
 }
 
 /// Account validation context for getting registered attestors (view function)

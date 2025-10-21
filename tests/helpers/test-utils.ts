@@ -118,14 +118,14 @@ export function findRegistryPDA(programId: PublicKey): TestRegistryPDA {
 }
 
 /**
- * Finds attester PDA for a given attester public key
+ * Finds attestor PDA for a given attestor public key
  */
-export function findAttesterPDA(
-  attester: PublicKey,
+export function findAttestorPDA(
+  attestor: PublicKey,
   programId: PublicKey
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("attester"), attester.toBuffer()],
+    [Buffer.from("attestor"), attestor.toBuffer()],
     programId
   );
 }
@@ -189,21 +189,21 @@ export async function initializeRegistryIfNotExists(
 }
 
 /**
- * Registers an attester with the registry
+ * Registers an attestor with the registry
  */
-export async function registerAttester(
+export async function registerAttestor(
   program: Program<PredicateRegistry>,
   authority: Keypair,
-  attester: PublicKey,
+  attestor: PublicKey,
   registryPda: PublicKey
 ): Promise<string> {
-  const [attesterPda] = findAttesterPDA(attester, program.programId);
+  const [attestorPda] = findAttestorPDA(attestor, program.programId);
 
   return await program.methods
-    .registerAttester(attester)
+    .registerAttestor(attestor)
     .accounts({
       registry: registryPda,
-      attesterAccount: attesterPda,
+      attestorAccount: attestorPda,
       authority: authority.publicKey,
       systemProgram: SystemProgram.programId,
     })
@@ -211,37 +211,37 @@ export async function registerAttester(
     .rpc();
 }
 
-export async function registerAttesterIfNotExists(
+export async function registerAttestorIfNotExists(
   program: Program<PredicateRegistry>,
   authority: Keypair,
-  attester: PublicKey,
+  attestor: PublicKey,
   registryPda: PublicKey
 ): Promise<string> {
   try {
-    await program.account.attesterAccount.fetch(
-      findAttesterPDA(attester, program.programId)[0]
+    await program.account.attestorAccount.fetch(
+      findAttestorPDA(attestor, program.programId)[0]
     );
-    console.log("Attester already exists");
+    console.log("Attestor already exists");
     return "";
   } catch (error) {
-    console.log("Attester does not exist");
+    console.log("Attestor does not exist");
   }
-  return await registerAttester(program, authority, attester, registryPda);
+  return await registerAttestor(program, authority, attestor, registryPda);
 }
 
 /**
- * Sets a policy ID for a client
+ * Sets a policy for a client
  */
-export async function setPolicyId(
+export async function setPolicy(
   program: Program<PredicateRegistry>,
   client: Keypair,
-  policyId: string,
+  policy: Buffer,
   registryPda: PublicKey
 ): Promise<string> {
   const [policyPda] = findPolicyPDA(client.publicKey, program.programId);
 
   return await program.methods
-    .setPolicyId(policyId)
+    .setPolicy(policy)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
@@ -253,18 +253,18 @@ export async function setPolicyId(
 }
 
 /**
- * Updates a policy ID for a client
+ * Updates a policy for a client
  */
-export async function updatePolicyId(
+export async function updatePolicy(
   program: Program<PredicateRegistry>,
   client: Keypair,
-  policyId: string,
+  policy: Buffer,
   registryPda: PublicKey
 ): Promise<string> {
   const [policyPda] = findPolicyPDA(client.publicKey, program.programId);
 
   return await program.methods
-    .updatePolicyId(policyId)
+    .updatePolicy(policy)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
@@ -275,24 +275,28 @@ export async function updatePolicyId(
 }
 
 /**
- * Creates a test statement structure
+ * Creates a test task structure
  */
-export function createTestStatement(
+export function createTestTask(
   uuid: Buffer,
   msgSender: PublicKey,
   target: PublicKey,
   msgValue: number,
   encodedSigAndArgs: Buffer,
-  policyId: string,
+  policy: Buffer,
   expiration: number
 ): any {
+  // Pad policy to 200 bytes
+  const paddedPolicy = Buffer.alloc(200);
+  policy.copy(paddedPolicy);
+
   return {
     uuid: Array.from(uuid),
     msgSender,
     target,
     msgValue: new anchor.BN(msgValue),
     encodedSigAndArgs: Array.from(encodedSigAndArgs),
-    policyId: policyId,
+    policy: Array.from(paddedPolicy),
     expiration: new anchor.BN(expiration),
   };
 }
@@ -302,13 +306,13 @@ export function createTestStatement(
  */
 export function createTestAttestation(
   uuid: Buffer,
-  attester: PublicKey,
+  attestor: PublicKey,
   signature: Buffer,
   expiration: number
 ): any {
   return {
     uuid: Array.from(uuid),
-    attester,
+    attestor,
     signature: Array.from(signature),
     expiration: new anchor.BN(expiration),
   };
@@ -404,13 +408,13 @@ export function getRegistryPDA(programId: PublicKey) {
 }
 
 /**
- * Wrapper for findAttesterPDA to match expected interface
+ * Wrapper for findAttestorPDA to match expected interface
  */
-export function getAttesterPDA(programId: PublicKey, attester: PublicKey) {
-  const [attesterPda, attesterBump] = findAttesterPDA(attester, programId);
+export function getAttestorPDA(programId: PublicKey, attestor: PublicKey) {
+  const [attestorPda, attestorBump] = findAttestorPDA(attestor, programId);
   return {
-    attesterPda,
-    attesterBump,
+    attestorPda,
+    attestorBump,
   };
 }
 
@@ -424,3 +428,4 @@ export function getPolicyPDA(programId: PublicKey, client: PublicKey) {
     policyBump,
   };
 }
+

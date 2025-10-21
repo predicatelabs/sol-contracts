@@ -1,21 +1,21 @@
-//! Set policy ID instruction for the predicate registry program
+//! Set policy instruction for the predicate registry program
 
 use anchor_lang::prelude::*;
-use crate::instructions::SetPolicyId;
+use crate::instructions::SetPolicy;
 use crate::events::PolicySet;
 use crate::errors::PredicateRegistryError;
 
-/// Set or update a policy ID for a client
+/// Set or update a policy for a client
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `policy_id` - The policy ID string to set
+/// * `policy` - The policy data to set
 /// 
 /// # Returns
 /// * `Result<()>` - Success or error
-pub fn set_policy_id(ctx: Context<SetPolicyId>, policy_id: String) -> Result<()> {
-    require!(!policy_id.is_empty(), PredicateRegistryError::InvalidPolicyId);
-    require!(policy_id.len() <= 64, PredicateRegistryError::PolicyIdTooLong);
+pub fn set_policy(ctx: Context<SetPolicy>, policy: Vec<u8>) -> Result<()> {
+    require!(!policy.is_empty(), PredicateRegistryError::InvalidPolicy);
+    require!(policy.len() <= 200, PredicateRegistryError::PolicyTooLong);
 
     let registry = &ctx.accounts.registry;
     let policy_account = &mut ctx.accounts.policy_account;
@@ -23,19 +23,18 @@ pub fn set_policy_id(ctx: Context<SetPolicyId>, policy_id: String) -> Result<()>
     let clock = Clock::get()?;
 
     // Initialize new policy account
-    policy_account.initialize(client.key(), policy_id.clone(), &clock)?;
+    policy_account.initialize(client.key(), &policy, &clock)?;
 
     // Emit policy set event
     emit!(PolicySet {
         registry: registry.key(),
         client: client.key(),
         setter: client.key(),
-        policy_id: policy_id.clone(),
+        policy: String::from_utf8_lossy(&policy).to_string(),
         timestamp: clock.unix_timestamp,
     });
 
-    msg!("Policy ID set for client {}: {}", client.key(), policy_id);
+    msg!("Policy set for client {}: {}", client.key(), String::from_utf8_lossy(&policy));
     
     Ok(())
 }
-
