@@ -70,7 +70,7 @@ pub fn increment(
     let counter = &mut ctx.accounts.counter;
     let clock = Clock::get()?;
     
-    let old_value = counter.get_value();
+    let old_value = counter.value;
     let new_value = counter.increment(&clock)?;
 
     emit!(CounterIncremented {

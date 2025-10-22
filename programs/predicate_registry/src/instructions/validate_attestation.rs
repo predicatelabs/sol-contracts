@@ -172,31 +172,44 @@ pub fn validate_attestation(
     Ok(true)
 }
 
-/// Verify Ed25519 signature using Solana's native ed25519_program
+/// Verify Ed25519 signature using defense-in-depth approach
 /// 
-/// This function checks that an ed25519 signature verification instruction
-/// was included in the same transaction as the current instruction.
+/// This function validates that an Ed25519 signature verification instruction
+/// was properly included in the same transaction using multiple security layers.
+/// 
+/// # Security Layers
+/// 1. Position check - Ed25519 must be immediately before this instruction
+/// 2. Program ID check - Must be Ed25519Program
+/// 3. Stateless check - Ed25519 instruction has no accounts
+/// 4. Instruction index validation - Data is self-contained (0xFFFF)
+/// 5. Offset validation - Offsets don't overlap with header
+/// 6. Message size validation - Exactly 32 bytes
+/// 7. Data comparison - Signature, pubkey, and message match expected values
 /// 
 /// # Arguments
 /// * `signature` - The 64-byte Ed25519 signature
 /// * `pubkey` - The 32-byte public key
-/// * `message` - The message that was signed
+/// * `message` - The message that was signed (32-byte hash)
 /// * `instructions_sysvar` - The instructions sysvar account
 /// 
 /// # Returns
-/// * `Result<()>` - Ok if signature is valid, error otherwise
+/// * `Result<()>` - Ok if all validation passes, error otherwise
 /// 
 /// # Security Notes
-/// - This function requires that the ed25519 verification instruction
-///   be included in the same transaction for security
-/// - The verification is done by Solana's native ed25519_program
-/// - This prevents signature forgery and ensures cryptographic security
+/// - Multiple independent layers prevent various attack vectors
+/// - Instruction index validation prevents cross-instruction data sourcing
+/// - The Ed25519Program has already verified the cryptographic signature
 fn verify_ed25519_signature(
     signature: &[u8; 64],
     pubkey: &[u8; 32],
     message: &[u8; 32],
     instructions_sysvar: &AccountInfo,
-) -> Result<()> {
+) -> Result<()> {    
+    const HEADER_LEN: usize = 16;
+    const SIG_LEN: usize = 64;
+    const PUBKEY_LEN: usize = 32;
+    const INSTRUCTION_INDEX_CURRENT: usize = u16::MAX as usize;
+
     // Verify this is the instructions sysvar account
     require!(
         instructions_sysvar.key == &instructions::ID,
@@ -224,31 +237,14 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
+    // Verify the instruction has no accounts (stateless check)
+    require!(
+        ed25519_ix.accounts.is_empty(),
+        PredicateRegistryError::InvalidSignature
+    );
+
     // Verify the instruction data format
     let ix_data = &ed25519_ix.data;
-    
-    // Standard Ed25519Program.createInstructionWithPublicKey format:
-    // The format is more complex and includes offsets and data layout
-    // We need to parse the instruction data according to the standard format
-    
-    require!(
-        ix_data.len() >= 144, // Minimum size for standard format
-        PredicateRegistryError::InvalidSignature
-    );
-
-    // Check num_signatures is 1 (first byte)
-    require!(
-        ix_data[0] == 1,
-        PredicateRegistryError::InvalidSignature
-    );
-
-    // For the standard format, we need to parse the data layout
-    // The signature, pubkey, and message are embedded in a structured format
-    // Let's extract them based on the standard Ed25519 instruction layout
-    
-    // The standard format has offsets at specific positions
-    // We'll verify by checking if the signature verification would pass
-    // by extracting the components from the standard format
     
     // Parse Ed25519 instruction format according to Solana's specification
     // Reference: https://docs.solana.com/developing/runtime-facilities/programs#ed25519-program
@@ -265,7 +261,7 @@ fn verify_ed25519_signature(
     // [16..] signature, pubkey, message
 
     require!(
-        ix_data.len() >= 16,
+        ix_data.len() >= HEADER_LEN,
         PredicateRegistryError::InvalidSignature
     );
 
@@ -276,19 +272,40 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
-    // Offsets are little-endian u16
+    // Parse offsets and instruction indices (all little-endian u16)
     let sig_offset = u16::from_le_bytes([ix_data[2], ix_data[3]]) as usize;
+    let sig_ix_idx = u16::from_le_bytes([ix_data[4], ix_data[5]]) as usize;
     let pubkey_offset = u16::from_le_bytes([ix_data[6], ix_data[7]]) as usize;
+    let pubkey_ix_idx = u16::from_le_bytes([ix_data[8], ix_data[9]]) as usize;
     let msg_offset = u16::from_le_bytes([ix_data[10], ix_data[11]]) as usize;
     let msg_size = u16::from_le_bytes([ix_data[12], ix_data[13]]) as usize;
+    let msg_ix_idx = u16::from_le_bytes([ix_data[14], ix_data[15]]) as usize;
 
-    // Check bounds
+    // Verify all instruction indices point to current instruction
+    // The Ed25519 program uses u16::MAX (0xFFFF) as a sentinel value for "current instruction"
+    // This prevents reading signature, public key, or message from other instructions
     require!(
-        ix_data.len() >= sig_offset + 64,
+        sig_ix_idx == INSTRUCTION_INDEX_CURRENT
+            && pubkey_ix_idx == INSTRUCTION_INDEX_CURRENT
+            && msg_ix_idx == INSTRUCTION_INDEX_CURRENT,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Verify all offsets point beyond the header (into the data region)
+    require!(
+        sig_offset >= HEADER_LEN 
+            && pubkey_offset >= HEADER_LEN 
+            && msg_offset >= HEADER_LEN,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Bounds checks for signature, pubkey, and message slices
+    require!(
+        ix_data.len() >= sig_offset + SIG_LEN,
         PredicateRegistryError::InvalidSignature
     );
     require!(
-        ix_data.len() >= pubkey_offset + 32,
+        ix_data.len() >= pubkey_offset + PUBKEY_LEN,
         PredicateRegistryError::InvalidSignature
     );
     require!(
@@ -296,23 +313,37 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
-    let sig_slice = &ix_data[sig_offset..sig_offset + 64];
-    let pubkey_slice = &ix_data[pubkey_offset..pubkey_offset + 32];
+    // Verify message size matches our expected hash size (32 bytes)
+    require!(
+        msg_size == 32,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Extract the signature, public key, and message from the instruction data
+    let sig_slice = &ix_data[sig_offset..sig_offset + SIG_LEN];
+    let pubkey_slice = &ix_data[pubkey_offset..pubkey_offset + PUBKEY_LEN];
     let msg_slice = &ix_data[msg_offset..msg_offset + msg_size];
 
+    // Verify that the signature matches what we expect
     require!(
         sig_slice == signature,
         PredicateRegistryError::InvalidSignature
     );
+
+    // Verify that the public key matches what we expect
     require!(
         pubkey_slice == pubkey,
         PredicateRegistryError::InvalidSignature
     );
+
+    // Verify that the message matches what we expect
     require!(
         msg_slice == message,
         PredicateRegistryError::InvalidSignature
     );
+
     // If we reach here, the signature verification instruction was properly included
-    // and matches our expected parameters
+    // and matches our expected parameters. The Ed25519Program has already verified
+    // the cryptographic signature (or the transaction would have failed).
     Ok(())
 }

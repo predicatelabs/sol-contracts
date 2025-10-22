@@ -3,14 +3,14 @@ import { Keypair, SystemProgram } from "@solana/web3.js";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 import {
   createTestAccount,
   findAttesterPDA,
   findPolicyPDA,
   registerAttester,
   setPolicyId,
-} from "./helpers/test-utils";
+} from "../helpers/test-utils";
 
 describe("Integration Tests", () => {
   let context: SharedTestContext;

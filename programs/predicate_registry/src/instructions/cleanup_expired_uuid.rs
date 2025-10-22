@@ -17,7 +17,7 @@ use crate::errors::PredicateRegistryError;
 /// 
 /// # Security Considerations
 /// - Only allows cleanup after statement expiration
-/// - Returns rent to the original payer
+/// - Enforces rent return to the original payer (belt-and-suspenders with account constraint)
 /// - Anyone can trigger cleanup (permissionless)
 pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
     let used_uuid_account = &ctx.accounts.used_uuid_account;
@@ -32,8 +32,15 @@ pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
         PredicateRegistryError::StatementNotExpired
     );
     
+    // Belt-and-suspenders: verify recipient matches original payer
+    // (This is already enforced by account constraint, but defensive programming)
+    require!(
+        ctx.accounts.validator_recipient.key() == used_uuid_account.validator,
+        PredicateRegistryError::Unauthorized
+    );
+    
     // The account will be closed by Anchor's `close` constraint
-    // Rent will be returned to the original validator automatically
+    // Rent will be returned to the original validator (enforced by constraint above)
     
     msg!(
         "Cleaned up expired UUID account, rent returned to {}",

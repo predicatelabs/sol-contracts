@@ -5,9 +5,7 @@
 
 pub mod initialize;
 pub mod increment;
-pub mod get_value;
 
 // Re-export instruction handlers
 pub use initialize::*;
 pub use increment::*;
-pub use get_value::*;

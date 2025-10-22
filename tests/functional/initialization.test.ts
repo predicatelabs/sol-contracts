@@ -3,7 +3,7 @@ import { SystemProgram } from "@solana/web3.js";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 
 describe("Registry Initialization", () => {
   let context: SharedTestContext;

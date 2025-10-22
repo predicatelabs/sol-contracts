@@ -5,11 +5,11 @@ import {
   setPolicyId,
   createFundedKeypair,
   createTestAccount,
-} from "./helpers/test-utils";
+} from "../helpers/test-utils";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 
 describe("Policy Management", () => {
   let context: SharedTestContext;

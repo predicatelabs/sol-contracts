@@ -11,7 +11,7 @@ import * as nacl from "tweetnacl";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 import {
   createTestAccount,
   findAttesterPDA,
@@ -21,7 +21,7 @@ import {
   getFutureTimestamp,
   getPastTimestamp,
   expectError,
-} from "./helpers/test-utils";
+} from "../helpers/test-utils";
 
 describe("Validate Attestation", () => {
   let context: SharedTestContext;

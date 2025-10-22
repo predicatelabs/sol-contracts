@@ -236,12 +236,16 @@ pub struct CleanupExpiredUuid<'info> {
         mut,
         close = validator_recipient,
         seeds = [b"used_uuid", &used_uuid_account.uuid],
-        bump
+        bump,
+        // CRITICAL: Enforce rent refund goes to the original payer
+        // This prevents attackers from stealing rent by passing their own address
+        constraint = validator_recipient.key() == used_uuid_account.validator
+            @ PredicateRegistryError::Unauthorized
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,
     
     /// The original validator (payer) who will receive the rent refund
-    /// CHECK: This is the account that originally paid for the UUID account
+    /// CHECK: Safe via constraint above; verified to match used_uuid_account.validator
     #[account(mut)]
     pub validator_recipient: AccountInfo<'info>,
 }

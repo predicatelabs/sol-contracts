@@ -57,21 +57,9 @@ pub enum PredicateRegistryError {
     #[msg("Attester not registered: The attester is not registered for validation")]
     AttesterNotRegisteredForValidation,
     
-    /// Error when policy string is too long (deprecated - use PolicyIdTooLong)
-    #[msg("Policy too long: Policy string exceeds maximum allowed length")]
-    PolicyTooLong,
-    
     /// Error when policy ID string is too long
     #[msg("Policy ID too long: Policy ID string exceeds maximum allowed length")]
     PolicyIdTooLong,
-    
-    /// Error when UUID string is too long
-    #[msg("UUID too long: UUID string exceeds maximum allowed length")]
-    UuidTooLong,
-    
-    /// Error when policy is empty or invalid (deprecated - use InvalidPolicyId)
-    #[msg("Invalid policy: Policy cannot be empty")]
-    InvalidPolicy,
     
     /// Error when policy ID is empty or invalid
     #[msg("Invalid policy ID: Policy ID cannot be empty")]

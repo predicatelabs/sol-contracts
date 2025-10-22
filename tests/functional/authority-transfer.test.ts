@@ -4,12 +4,12 @@ import {
   registerAttester,
   createFundedKeypair,
   createTestAccount,
-} from "./helpers/test-utils";
+} from "../helpers/test-utils";
 import {
   setupSharedTestContext,
   SharedTestContext,
   verifyAuthorityState,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 import * as anchor from "@coral-xyz/anchor";
 
 describe("Authority Transfer", () => {

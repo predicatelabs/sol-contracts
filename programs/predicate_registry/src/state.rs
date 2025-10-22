@@ -216,20 +216,4 @@ impl Statement {
         
         hash(&data).to_bytes()
     }
-
-    /// Hash the statement with expiry (equivalent to hashStatementWithExpiry in Solidity)
-    pub fn hash_statement_with_expiry(&self) -> [u8; 32] {
-        use anchor_lang::solana_program::hash::hash;
-        
-        let mut data = Vec::new();
-        data.extend_from_slice(&self.uuid);
-        data.extend_from_slice(&self.msg_sender.to_bytes());
-        data.extend_from_slice(&self.target.to_bytes());
-        data.extend_from_slice(&self.msg_value.to_le_bytes());
-        data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(self.policy_id.as_bytes());
-        data.extend_from_slice(&self.expiration.to_le_bytes());
-        
-        hash(&data).to_bytes()
-    }
 }
