@@ -20,6 +20,10 @@ pub enum PredicateRegistryError {
     #[msg("Unauthorized: Only the authority can perform this action")]
     Unauthorized,
     
+    /// Error when an invalid authority address is provided
+    #[msg("Invalid authority: The provided authority address is invalid")]
+    InvalidAuthority,
+    
     /// Error when trying to initialize an already initialized registry
     #[msg("Already initialized: Registry has already been initialized")]
     AlreadyInitialized,

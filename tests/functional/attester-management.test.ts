@@ -200,7 +200,6 @@ describe("Attester Management", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -227,7 +226,6 @@ describe("Attester Management", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();

@@ -195,6 +195,38 @@ describe("Policy Management", () => {
       expect(policyAfter.setAt.toNumber()).to.equal(setAtBefore); // Should not change
     });
 
+    it("Should NOT increment registry policy count when updating existing policy", async () => {
+      const [policyPda] = findPolicyPDA(
+        client1.keypair.publicKey,
+        context.program.programId
+      );
+
+      // Get policy count before update
+      const registryBefore =
+        await context.program.account.predicateRegistry.fetch(
+          context.registry.registryPda
+        );
+      const countBefore = registryBefore.totalPolicies.toNumber();
+
+      // Update the policy
+      await context.program.methods
+        .updatePolicyId(updatedPolicyId)
+        .accounts({
+          registry: context.registry.registryPda,
+          policyAccount: policyPda,
+          client: client1.keypair.publicKey,
+        } as any)
+        .signers([client1.keypair])
+        .rpc();
+
+      // Verify policy count has NOT changed
+      const registryAfter =
+        await context.program.account.predicateRegistry.fetch(
+          context.registry.registryPda
+        );
+      expect(registryAfter.totalPolicies.toNumber()).to.equal(countBefore);
+    });
+
     it("Should fail to update with unauthorized client", async () => {
       const [policyPda] = findPolicyPDA(
         client1.keypair.publicKey,
@@ -284,6 +316,51 @@ describe("Policy Management", () => {
         policyPda
       );
       expect(policyAccount.policyId).to.equal(specialPolicyId);
+    });
+
+    it("Should increment registry policy count when setting new policies", async () => {
+      // Get initial policy count
+      const registryBefore =
+        await context.program.account.predicateRegistry.fetch(
+          context.registry.registryPda
+        );
+      const initialCount = registryBefore.totalPolicies.toNumber();
+
+      // Create and set policy for a new client
+      const client1 = await createTestAccount(context.provider);
+      await setPolicyId(
+        context.program,
+        client1.keypair,
+        "test-policy-count-1",
+        context.registry.registryPda
+      );
+
+      // Check count increased by 1
+      const registryAfter1 =
+        await context.program.account.predicateRegistry.fetch(
+          context.registry.registryPda
+        );
+      expect(registryAfter1.totalPolicies.toNumber()).to.equal(
+        initialCount + 1
+      );
+
+      // Set another policy for a different client
+      const client2 = await createTestAccount(context.provider);
+      await setPolicyId(
+        context.program,
+        client2.keypair,
+        "test-policy-count-2",
+        context.registry.registryPda
+      );
+
+      // Check count increased by 2 total
+      const registryAfter2 =
+        await context.program.account.predicateRegistry.fetch(
+          context.registry.registryPda
+        );
+      expect(registryAfter2.totalPolicies.toNumber()).to.equal(
+        initialCount + 2
+      );
     });
   });
 });

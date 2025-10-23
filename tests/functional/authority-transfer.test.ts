@@ -60,7 +60,6 @@ describe("Authority Transfer", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: currentAuthority.publicKey,
-              newAuthority: context.authority.keypair.publicKey,
             } as any)
             .signers([currentAuthority])
             .rpc();
@@ -87,7 +86,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -115,7 +113,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -147,7 +144,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -163,7 +159,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -175,7 +170,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -215,7 +209,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -242,7 +235,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -260,7 +252,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: unauthorizedAuthority.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([unauthorizedAuthority])
           .rpc();
@@ -281,7 +272,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -293,7 +283,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey, // Old authority
-            newAuthority: client1.keypair.publicKey,
           } as any)
           .signers([context.authority.keypair])
           .rpc();
@@ -309,7 +298,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -324,7 +312,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([]) // No signers
           .rpc();
@@ -345,7 +332,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([client1.keypair]) // Wrong signer
           .rpc();
@@ -353,6 +339,26 @@ describe("Authority Transfer", () => {
         expect.fail("Should have thrown an error");
       } catch (error: any) {
         expect(error.message).to.include("unknown signer");
+      }
+    });
+
+    it("Should fail when transferring to zero address", async () => {
+      const { PublicKey } = await import("@solana/web3.js");
+      const zeroAddress = PublicKey.default;
+
+      try {
+        await context.program.methods
+          .transferAuthority(zeroAddress)
+          .accounts({
+            registry: context.registry.registryPda,
+            authority: context.authority.keypair.publicKey,
+          } as any)
+          .signers([context.authority.keypair])
+          .rpc();
+
+        expect.fail("Should have thrown an error");
+      } catch (error: any) {
+        expect(error.message).to.include("Invalid authority");
       }
     });
   });
@@ -370,7 +376,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -384,7 +389,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: newAuthority.keypair.publicKey,
-            newAuthority: context.authority.keypair.publicKey,
           } as any)
           .signers([newAuthority.keypair])
           .rpc();
@@ -481,7 +485,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: thirdAuthority.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -546,7 +549,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: currentAuthority.publicKey,
-            newAuthority: nextAuthority.publicKey,
           } as any)
           .signers([currentAuthority])
           .rpc();
@@ -568,7 +570,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: currentAuthority.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([currentAuthority])
         .rpc();
@@ -595,7 +596,6 @@ describe("Authority Transfer", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: tracker.getCurrent().publicKey,
-              newAuthority: nextAuthority.publicKey,
             } as any)
             .signers([tracker.getCurrent()])
             .rpc();
@@ -630,7 +630,6 @@ describe("Authority Transfer", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: tracker.getCurrent().publicKey,
-              newAuthority: nextAuthority.publicKey,
             } as any)
             .signers([tracker.getCurrent()])
             .rpc();
@@ -660,7 +659,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: tracker.getCurrent().publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([tracker.getCurrent()])
           .rpc();

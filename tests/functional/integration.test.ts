@@ -69,7 +69,6 @@ describe("Integration Tests", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: currentAuthorityKeypair.publicKey,
-              newAuthority: originalAuthority.publicKey,
             } as any)
             .signers([currentAuthorityKeypair])
             .rpc();
@@ -148,7 +147,6 @@ describe("Integration Tests", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -195,7 +193,6 @@ describe("Integration Tests", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: currentAuthority.publicKey,
-            newAuthority: nextAuthority.publicKey,
           } as any)
           .signers([currentAuthority])
           .rpc();
@@ -278,7 +275,6 @@ describe("Integration Tests", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: currentAuthorityKeypair.publicKey,
-              newAuthority: originalAuthority.publicKey,
             } as any)
             .signers([currentAuthorityKeypair])
             .rpc();
@@ -301,7 +297,6 @@ describe("Integration Tests", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -467,7 +462,6 @@ describe("Integration Tests", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: currentAuthorityKeypair.publicKey,
-              newAuthority: originalAuthority.publicKey,
             } as any)
             .signers([currentAuthorityKeypair])
             .rpc();
@@ -658,7 +652,6 @@ describe("Integration Tests", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -704,7 +697,6 @@ describe("Integration Tests", () => {
             .accounts({
               registry: context.registry.registryPda,
               authority: currentAuthorityKeypair.publicKey,
-              newAuthority: originalAuthority.publicKey,
             } as any)
             .signers([currentAuthorityKeypair])
             .rpc();

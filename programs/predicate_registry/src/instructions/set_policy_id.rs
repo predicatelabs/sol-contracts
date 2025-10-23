@@ -17,13 +17,16 @@ pub fn set_policy_id(ctx: Context<SetPolicyId>, policy_id: String) -> Result<()>
     require!(!policy_id.is_empty(), PredicateRegistryError::InvalidPolicyId);
     require!(policy_id.len() <= 64, PredicateRegistryError::PolicyIdTooLong);
 
-    let registry = &ctx.accounts.registry;
+    let registry = &mut ctx.accounts.registry;
     let policy_account = &mut ctx.accounts.policy_account;
     let client = &ctx.accounts.client;
     let clock = Clock::get()?;
 
     // Initialize new policy account
     policy_account.initialize(client.key(), policy_id.clone(), &clock)?;
+
+    // Increment policy count in registry
+    registry.increment_policy_count(&clock)?;
 
     // Emit policy set event
     emit!(PolicySet {

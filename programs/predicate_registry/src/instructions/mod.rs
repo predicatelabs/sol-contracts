@@ -109,8 +109,9 @@ pub struct DeregisterAttester<'info> {
 /// Account validation context for setting a policy ID
 #[derive(Accounts)]
 pub struct SetPolicyId<'info> {
-    /// The registry account (for event emission)
+    /// The registry account (for event emission and stats tracking)
     #[account(
+        mut,
         seeds = [b"predicate_registry"],
         bump
     )]
@@ -222,10 +223,6 @@ pub struct TransferAuthority<'info> {
     
     /// The current authority
     pub authority: Signer<'info>,
-    
-    /// The new authority (must be a valid account)
-    /// CHECK: This is safe because we only store the pubkey
-    pub new_authority: AccountInfo<'info>,
 }
 
 /// Account validation context for cleaning up expired UUIDs
