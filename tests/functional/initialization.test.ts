@@ -3,7 +3,7 @@ import { SystemProgram } from "@solana/web3.js";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+} from "../helpers/shared-setup";
 
 describe("Registry Initialization", () => {
   let context: SharedTestContext;
@@ -26,7 +26,7 @@ describe("Registry Initialization", () => {
         context.authority.keypair.publicKey.toString()
       );
       expect(
-        registryAccount.totalAttestors.toNumber()
+        registryAccount.totalAttesters.toNumber()
       ).to.be.greaterThanOrEqual(0);
       expect(registryAccount.totalPolicies.toNumber()).to.be.greaterThanOrEqual(
         0

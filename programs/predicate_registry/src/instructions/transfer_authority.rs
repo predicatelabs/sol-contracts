@@ -13,9 +13,17 @@ use crate::events::AuthorityTransferred;
 /// # Returns
 /// * `Result<()>` - Success or error
 pub fn transfer_authority(ctx: Context<TransferAuthority>, new_authority: Pubkey) -> Result<()> {
+    use crate::errors::PredicateRegistryError;
+    
     let registry = &mut ctx.accounts.registry;
     let _current_authority = &ctx.accounts.authority;
     let clock = Clock::get()?;
+
+    // Validate new authority is not the zero/default address
+    require!(
+        new_authority != Pubkey::default(),
+        PredicateRegistryError::InvalidAuthority
+    );
 
     let previous_authority = registry.authority;
 

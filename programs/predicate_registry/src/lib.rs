@@ -1,13 +1,13 @@
 //! # Predicate Registry Program
 //! 
-//! A comprehensive predicate registry program for managing attestors, policies, and task validation
-//! on Solana. This program provides a decentralized way to register attestors, set client policies,
-//! and validate tasks with cryptographic attestations.
+//! A comprehensive predicate registry program for managing attesters, policies, and statement validation
+//! on Solana. This program provides a decentralized way to register attesters, set client policies,
+//! and validate statements with cryptographic attestations.
 //!
 //! ## Features
-//! - Attestor registration and management
+//! - Attester registration and management
 //! - Client policy management
-//! - Task validation with cryptographic attestations
+//! - Statement validation with cryptographic attestations
 //! - Authority management and transfer
 //!
 //! ## Security
@@ -60,129 +60,150 @@ pub mod predicate_registry {
         instructions::initialize(ctx)
     }
 
-    /// Register a new attestor
+    /// Register a new attester
     /// 
-    /// Allows the registry authority to register a new attestor who can
-    /// provide attestations for task validation.
+    /// Allows the registry authority to register a new attester who can
+    /// provide attestations for statement validation.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `attestor` - The public key of the attestor to register
+    /// * `attester` - The public key of the attester to register
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
     /// 
     /// # Events
-    /// * `AttestorRegistered` - Emitted when attestor is successfully registered
+    /// * `AttesterRegistered` - Emitted when attester is successfully registered
     /// 
     /// # Errors
-    /// * `AttestorAlreadyRegistered` - If attestor is already registered
+    /// * `AttesterAlreadyRegistered` - If attester is already registered
     /// * `Unauthorized` - If caller is not the registry authority
-    pub fn register_attestor(ctx: Context<RegisterAttestor>, attestor: Pubkey) -> Result<()> {
-        instructions::register_attestor(ctx, attestor)
+    pub fn register_attester(ctx: Context<RegisterAttester>, attester: Pubkey) -> Result<()> {
+        instructions::register_attester(ctx, attester)
     }
 
-    /// Deregister an existing attestor
+    /// Deregister an existing attester
     /// 
-    /// Allows the registry authority to deregister an attestor, preventing
+    /// Allows the registry authority to deregister an attester, preventing
     /// them from providing new attestations.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `attestor` - The public key of the attestor to deregister
+    /// * `attester` - The public key of the attester to deregister
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
     /// 
     /// # Events
-    /// * `AttestorDeregistered` - Emitted when attestor is successfully deregistered
+    /// * `AttesterDeregistered` - Emitted when attester is successfully deregistered
     /// 
     /// # Errors
-    /// * `AttestorNotRegistered` - If attestor is not currently registered
+    /// * `AttesterNotRegistered` - If attester is not currently registered
     /// * `Unauthorized` - If caller is not the registry authority
-    pub fn deregister_attestor(ctx: Context<DeregisterAttestor>, attestor: Pubkey) -> Result<()> {
-        instructions::deregister_attestor(ctx, attestor)
+    pub fn deregister_attester(ctx: Context<DeregisterAttester>, attester: Pubkey) -> Result<()> {
+        instructions::deregister_attester(ctx, attester)
     }
 
-    /// Set a policy for a client
+    /// Set a policy ID for a client
     /// 
-    /// Allows a client to set their validation policy string.
-    /// This policy will be used when validating tasks from this client.
+    /// Allows a client to set their validation policy ID.
+    /// This policy ID will be used when validating statements from this client.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `policy` - The policy data (max 200 bytes)
+    /// * `policy_id` - The policy ID string (max 64 bytes)
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
     /// 
     /// # Events
-    /// * `PolicySet` - Emitted when policy is successfully set
+    /// * `PolicySet` - Emitted when policy ID is successfully set
     /// 
     /// # Errors
-    /// * `PolicyTooLong` - If policy data exceeds 200 bytes
-    /// * `InvalidPolicy` - If policy data is empty
-    pub fn set_policy(ctx: Context<SetPolicy>, policy: Vec<u8>) -> Result<()> {
-        instructions::set_policy(ctx, policy)
+    /// * `PolicyIdTooLong` - If policy ID exceeds 64 bytes
+    /// * `InvalidPolicyId` - If policy ID is empty
+    pub fn set_policy_id(ctx: Context<SetPolicyId>, policy_id: String) -> Result<()> {
+        instructions::set_policy_id(ctx, policy_id)
     }
 
-    /// Update an existing policy for a client
+    /// Update an existing policy ID for a client
     /// 
-    /// Allows a client to update their existing validation policy string.
+    /// Allows a client to update their existing validation policy ID.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `policy` - The new policy data (max 200 bytes)
+    /// * `policy_id` - The new policy ID string (max 64 bytes)
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
     /// 
     /// # Events
-    /// * `PolicyUpdated` - Emitted when policy is successfully updated
+    /// * `PolicyUpdated` - Emitted when policy ID is successfully updated
     /// 
     /// # Errors
-    /// * `PolicyTooLong` - If policy data exceeds 200 bytes
-    /// * `InvalidPolicy` - If policy data is empty
+    /// * `PolicyIdTooLong` - If policy ID exceeds 64 bytes
+    /// * `InvalidPolicyId` - If policy ID is empty
     /// * `PolicyNotFound` - If no existing policy found for client
-    pub fn update_policy(ctx: Context<UpdatePolicy>, policy: Vec<u8>) -> Result<()> {
-        instructions::update_policy(ctx, policy)
+    pub fn update_policy_id(ctx: Context<UpdatePolicyId>, policy_id: String) -> Result<()> {
+        instructions::update_policy_id(ctx, policy_id)
     }
 
-    /// Validate an attestation for a task
+    /// Validate an attestation for a statement
     /// 
-    /// Validates that an attestation is valid for a given task, checking:
-    /// - Attestor is registered
-    /// - Task hasn't expired
+    /// Validates that an attestation is valid for a given statement, checking:
+    /// - Attester is registered
+    /// - Statement hasn't expired
     /// - Attestation signature is valid
     /// - Policy matches
+    /// - UUID hasn't been used before (replay protection)
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `task` - The task to validate
-    /// * `attestation` - The attestation for the task
-    /// * `attestor_key` - The public key of the attestor
+    /// * `statement` - The statement to validate
+    /// * `attestation` - The attestation for the statement
+    /// * `attester_key` - The public key of the attester
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
     /// 
     /// # Events
-    /// * `TaskValidated` - Emitted when task is successfully validated
+    /// * `StatementValidated` - Emitted when statement is successfully validated
+    /// * `UuidMarkedUsed` - Emitted when UUID is marked as used
     /// 
     /// # Errors
-    /// * `AttestorNotRegisteredForValidation` - If attestor is not registered
-    /// * `TaskExpired` - If task has expired
+    /// * `AttesterNotRegisteredForValidation` - If attester is not registered
+    /// * `StatementExpired` - If statement has expired
     /// * `AttestationExpired` - If attestation has expired
     /// * `InvalidSignature` - If attestation signature is invalid
-    /// * `TaskIdMismatch` - If task and attestation UUIDs don't match
-    /// * `ExpirationMismatch` - If task and attestation expirations don't match
-    /// * `WrongAttestor` - If signature doesn't match provided attestor
+    /// * `StatementIdMismatch` - If statement and attestation UUIDs don't match
+    /// * `ExpirationMismatch` - If statement and attestation expirations don't match
+    /// * `WrongAttester` - If signature doesn't match provided attester
+    /// * `UuidAlreadyUsed` - If UUID has already been validated (replay attack)
     pub fn validate_attestation(
         ctx: Context<ValidateAttestation>, 
-        task: Task, 
-        attestor_key: Pubkey,
+        statement: Statement, 
+        attester_key: Pubkey,
         attestation: Attestation
     ) -> Result<()> {
-        instructions::validate_attestation(ctx, task, attestor_key, attestation).map(|_| ())
+        instructions::validate_attestation(ctx, statement, attester_key, attestation).map(|_| ())
+    }
+
+    /// Cleanup an expired UUID account to reclaim rent
+    /// 
+    /// Allows anyone to cleanup expired UUID accounts, returning the rent
+    /// to the original validator (payer). This is permissionless and can be
+    /// called by anyone after the statement has expired.
+    /// 
+    /// # Arguments
+    /// * `ctx` - The instruction context containing accounts
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    /// 
+    /// # Errors
+    /// * `StatementNotExpired` - If statement hasn't expired yet
+    pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
+        instructions::cleanup_expired_uuid(ctx)
     }
 
     /// Transfer registry authority to a new account

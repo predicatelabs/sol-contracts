@@ -2,28 +2,28 @@
 
 use anchor_lang::prelude::*;
 use crate::instructions::ValidateAttestation;
-use crate::state::{Task, Attestation};
-use crate::events::TaskValidated;
+use crate::state::{Statement, Attestation};
+use crate::events::{StatementValidated, UuidMarkedUsed};
 use crate::errors::PredicateRegistryError;
 use anchor_lang::solana_program::{
     ed25519_program,
     sysvar::instructions::{self, load_current_index_checked, load_instruction_at_checked},
 };
 
-/// Validate an attestation for a task
+/// Validate an attestation for a statement
 /// 
 /// This function performs comprehensive validation of an attestation including:
 /// - Input validation and sanitization
-/// - Expiration checks for both task and attestation
+/// - Expiration checks for both statement and attestation
 /// - Policy verification
-/// - Attestor registration verification
+/// - Attester registration verification
 /// - Ed25519 signature verification using Solana's native program
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `task` - The task to be validated
-/// * `attestation` - The attestation from the attestor
-/// * `attestor_key` - The public key of the attestor
+/// * `statement` - The statement to be validated
+/// * `attestation` - The attestation from the attester
+/// * `attester_key` - The public key of the attester
 /// 
 /// # Returns
 /// * `Result<bool>` - True if validation successful
@@ -35,13 +35,14 @@ use anchor_lang::solana_program::{
 /// - Comprehensive error handling with specific error types
 pub fn validate_attestation(
     ctx: Context<ValidateAttestation>, 
-    task: Task, 
-    attestor_key: Pubkey,
+    statement: Statement, 
+    attester_key: Pubkey,
     attestation: Attestation
 ) -> Result<bool> {
     let registry: &mut Account<'_, crate::PredicateRegistry> = &mut ctx.accounts.registry;
-    let attestor_account = &mut ctx.accounts.attestor_account;
+    let attester_account = &mut ctx.accounts.attester_account;
     let policy_account = &ctx.accounts.policy_account;
+    let used_uuid_account = &mut ctx.accounts.used_uuid_account;
     let validator = &ctx.accounts.validator;
     
     // Get current timestamp with error handling
@@ -56,23 +57,23 @@ pub fn validate_attestation(
         PredicateRegistryError::InvalidSignature
     );
 
-    // Validate policy is not empty
+    // Validate policy ID is not empty
     require!(
-        !task.get_policy().is_empty() && !policy_account.get_policy().is_empty(),
-        PredicateRegistryError::InvalidPolicy
+        !statement.policy_id.is_empty() && !policy_account.policy_id.is_empty(),
+        PredicateRegistryError::InvalidPolicyId
     );
 
     // === BUSINESS LOGIC VALIDATION ===
 
-    // Check if task ID matches attestation ID
+    // Check if statement ID matches attestation ID
     require!(
-        task.uuid == attestation.uuid,
-        PredicateRegistryError::TaskIdMismatch
+        statement.uuid == attestation.uuid,
+        PredicateRegistryError::StatementIdMismatch
     );
 
-    // Check if task expiration matches attestation expiration
+    // Check if statement expiration matches attestation expiration
     require!(
-        task.expiration == attestation.expiration,
+        statement.expiration == attestation.expiration,
         PredicateRegistryError::ExpirationMismatch
     );
 
@@ -83,100 +84,132 @@ pub fn validate_attestation(
         PredicateRegistryError::AttestationExpired
     );
 
-    // Check if task has expired
+    // Check if statement has expired
     require!(
-        current_timestamp <= task.expiration + CLOCK_DRIFT_BUFFER,
-        PredicateRegistryError::TaskExpired
+        current_timestamp <= statement.expiration + CLOCK_DRIFT_BUFFER,
+        PredicateRegistryError::StatementExpired
     );
 
-    // Verify the policy matches exactly
+    // Verify the policy ID matches exactly
     require!(
-        task.get_policy() == policy_account.get_policy(),
-        PredicateRegistryError::InvalidPolicy
+        statement.policy_id == policy_account.policy_id,
+        PredicateRegistryError::PolicyIdMismatch
     );
 
-    // Verify that the attestor key matches the provided attestor_key parameter
+    // Verify that the attester key matches the provided attester_key parameter
     require!(
-        attestor_key == attestor_account.attestor,
-        PredicateRegistryError::WrongAttestor
+        attester_key == attester_account.attester,
+        PredicateRegistryError::WrongAttester
     );
 
-    // Verify that the attestor in the attestation matches the registered attestor
+    // Verify that the attester in the attestation matches the registered attester
     require!(
-        attestation.attestor == attestor_account.attestor,
-        PredicateRegistryError::WrongAttestor
+        attestation.attester == attester_account.attester,
+        PredicateRegistryError::WrongAttester
     );
 
-    // Verify that the attestor is registered and active
+    // Verify that the attester is registered and active
     require!(
-        attestor_account.is_registered,
-        PredicateRegistryError::AttestorNotRegisteredForValidation
+        attester_account.is_registered,
+        PredicateRegistryError::AttesterNotRegisteredForValidation
     );
 
 
     // === SIGNATURE VERIFICATION ===
     
-    // Hash the task for signature verification
-    let message_hash = task.hash_task_safe(validator.key());
+    // Hash the statement for signature verification
+    let message_hash = statement.hash_statement_safe(validator.key());
     
     // Verify Ed25519 signature using Solana's native verification
     // This implementation checks that the ed25519 verification instruction was included
     // in the same transaction as this instruction
     verify_ed25519_signature(
         &attestation.signature,
-        &attestation.attestor.to_bytes(),
+        &attestation.attester.to_bytes(),
         &message_hash,
         &ctx.accounts.instructions_sysvar,
     )?;
 
-    // Emit events
-    emit!(TaskValidated {
+    // === REPLAY PROTECTION: Mark UUID as used ===
+    // Note: The `init` constraint on used_uuid_account will automatically fail
+    // if the UUID account already exists, preventing replay attacks.
+    // This is the primary replay protection mechanism.
+    
+    // Initialize the used_uuid_account
+    used_uuid_account.uuid = statement.uuid;
+    used_uuid_account.used_at = current_timestamp;
+    used_uuid_account.expires_at = statement.expiration;
+    used_uuid_account.validator = validator.key();
+
+    // Emit UUID marked as used event
+    emit!(UuidMarkedUsed {
+        uuid: statement.format_uuid(),
+        validator: validator.key(),
+        expires_at: statement.expiration,
+        timestamp: current_timestamp,
+    });
+
+    // Emit statement validated event
+    emit!(StatementValidated {
         registry: registry.key(),
-        msg_sender: task.msg_sender,
-        target: task.target,
-        attestor: attestation.attestor,
-        msg_value: task.msg_value,
-        policy: String::from_utf8_lossy(task.get_policy()).to_string(),
-        uuid: task.format_uuid(),
-        expiration: task.expiration,
+        msg_sender: statement.msg_sender,
+        target: statement.target,
+        attester: attestation.attester,
+        msg_value: statement.msg_value,
+        policy_id: statement.policy_id.clone(),
+        uuid: statement.format_uuid(),
+        expiration: statement.expiration,
         timestamp: clock.unix_timestamp,
     });
 
     msg!(
-        "Task {} validated by attestor {} for client {}",
-        task.format_uuid(),
-        attestation.attestor,
-        task.msg_sender
+        "Statement {} validated by attester {} for client {}",
+        statement.format_uuid(),
+        attestation.attester,
+        statement.msg_sender
     );
 
     Ok(true)
 }
 
-/// Verify Ed25519 signature using Solana's native ed25519_program
+/// Verify Ed25519 signature using defense-in-depth approach
 /// 
-/// This function checks that an ed25519 signature verification instruction
-/// was included in the same transaction as the current instruction.
+/// This function validates that an Ed25519 signature verification instruction
+/// was properly included in the same transaction using multiple security layers.
+/// 
+/// # Security Layers
+/// 1. Position check - Ed25519 must be immediately before this instruction
+/// 2. Program ID check - Must be Ed25519Program
+/// 3. Stateless check - Ed25519 instruction has no accounts
+/// 4. Instruction index validation - Data is self-contained (0xFFFF)
+/// 5. Offset validation - Offsets don't overlap with header
+/// 6. Message size validation - Exactly 32 bytes
+/// 7. Data comparison - Signature, pubkey, and message match expected values
 /// 
 /// # Arguments
 /// * `signature` - The 64-byte Ed25519 signature
 /// * `pubkey` - The 32-byte public key
-/// * `message` - The message that was signed
+/// * `message` - The message that was signed (32-byte hash)
 /// * `instructions_sysvar` - The instructions sysvar account
 /// 
 /// # Returns
-/// * `Result<()>` - Ok if signature is valid, error otherwise
+/// * `Result<()>` - Ok if all validation passes, error otherwise
 /// 
 /// # Security Notes
-/// - This function requires that the ed25519 verification instruction
-///   be included in the same transaction for security
-/// - The verification is done by Solana's native ed25519_program
-/// - This prevents signature forgery and ensures cryptographic security
+/// - Multiple independent layers prevent various attack vectors
+/// - Instruction index validation prevents cross-instruction data sourcing
+/// - The Ed25519Program has already verified the cryptographic signature
 fn verify_ed25519_signature(
     signature: &[u8; 64],
     pubkey: &[u8; 32],
     message: &[u8; 32],
     instructions_sysvar: &AccountInfo,
-) -> Result<()> {
+) -> Result<()> {    
+    const HEADER_LEN: usize = 16;
+    const SIG_LEN: usize = 64;
+    const PUBKEY_LEN: usize = 32;
+    const INSTRUCTION_INDEX_CURRENT: usize = u16::MAX as usize;
+
     // Verify this is the instructions sysvar account
     require!(
         instructions_sysvar.key == &instructions::ID,
@@ -204,31 +237,14 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
+    // Verify the instruction has no accounts (stateless check)
+    require!(
+        ed25519_ix.accounts.is_empty(),
+        PredicateRegistryError::InvalidSignature
+    );
+
     // Verify the instruction data format
     let ix_data = &ed25519_ix.data;
-    
-    // Standard Ed25519Program.createInstructionWithPublicKey format:
-    // The format is more complex and includes offsets and data layout
-    // We need to parse the instruction data according to the standard format
-    
-    require!(
-        ix_data.len() >= 144, // Minimum size for standard format
-        PredicateRegistryError::InvalidSignature
-    );
-
-    // Check num_signatures is 1 (first byte)
-    require!(
-        ix_data[0] == 1,
-        PredicateRegistryError::InvalidSignature
-    );
-
-    // For the standard format, we need to parse the data layout
-    // The signature, pubkey, and message are embedded in a structured format
-    // Let's extract them based on the standard Ed25519 instruction layout
-    
-    // The standard format has offsets at specific positions
-    // We'll verify by checking if the signature verification would pass
-    // by extracting the components from the standard format
     
     // Parse Ed25519 instruction format according to Solana's specification
     // Reference: https://docs.solana.com/developing/runtime-facilities/programs#ed25519-program
@@ -245,7 +261,7 @@ fn verify_ed25519_signature(
     // [16..] signature, pubkey, message
 
     require!(
-        ix_data.len() >= 16,
+        ix_data.len() >= HEADER_LEN,
         PredicateRegistryError::InvalidSignature
     );
 
@@ -256,19 +272,40 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
-    // Offsets are little-endian u16
+    // Parse offsets and instruction indices (all little-endian u16)
     let sig_offset = u16::from_le_bytes([ix_data[2], ix_data[3]]) as usize;
+    let sig_ix_idx = u16::from_le_bytes([ix_data[4], ix_data[5]]) as usize;
     let pubkey_offset = u16::from_le_bytes([ix_data[6], ix_data[7]]) as usize;
+    let pubkey_ix_idx = u16::from_le_bytes([ix_data[8], ix_data[9]]) as usize;
     let msg_offset = u16::from_le_bytes([ix_data[10], ix_data[11]]) as usize;
     let msg_size = u16::from_le_bytes([ix_data[12], ix_data[13]]) as usize;
+    let msg_ix_idx = u16::from_le_bytes([ix_data[14], ix_data[15]]) as usize;
 
-    // Check bounds
+    // Verify all instruction indices point to current instruction
+    // The Ed25519 program uses u16::MAX (0xFFFF) as a sentinel value for "current instruction"
+    // This prevents reading signature, public key, or message from other instructions
     require!(
-        ix_data.len() >= sig_offset + 64,
+        sig_ix_idx == INSTRUCTION_INDEX_CURRENT
+            && pubkey_ix_idx == INSTRUCTION_INDEX_CURRENT
+            && msg_ix_idx == INSTRUCTION_INDEX_CURRENT,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Verify all offsets point beyond the header (into the data region)
+    require!(
+        sig_offset >= HEADER_LEN 
+            && pubkey_offset >= HEADER_LEN 
+            && msg_offset >= HEADER_LEN,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Bounds checks for signature, pubkey, and message slices
+    require!(
+        ix_data.len() >= sig_offset + SIG_LEN,
         PredicateRegistryError::InvalidSignature
     );
     require!(
-        ix_data.len() >= pubkey_offset + 32,
+        ix_data.len() >= pubkey_offset + PUBKEY_LEN,
         PredicateRegistryError::InvalidSignature
     );
     require!(
@@ -276,23 +313,37 @@ fn verify_ed25519_signature(
         PredicateRegistryError::InvalidSignature
     );
 
-    let sig_slice = &ix_data[sig_offset..sig_offset + 64];
-    let pubkey_slice = &ix_data[pubkey_offset..pubkey_offset + 32];
+    // Verify message size matches our expected hash size (32 bytes)
+    require!(
+        msg_size == 32,
+        PredicateRegistryError::InvalidSignature
+    );
+
+    // Extract the signature, public key, and message from the instruction data
+    let sig_slice = &ix_data[sig_offset..sig_offset + SIG_LEN];
+    let pubkey_slice = &ix_data[pubkey_offset..pubkey_offset + PUBKEY_LEN];
     let msg_slice = &ix_data[msg_offset..msg_offset + msg_size];
 
+    // Verify that the signature matches what we expect
     require!(
         sig_slice == signature,
         PredicateRegistryError::InvalidSignature
     );
+
+    // Verify that the public key matches what we expect
     require!(
         pubkey_slice == pubkey,
         PredicateRegistryError::InvalidSignature
     );
+
+    // Verify that the message matches what we expect
     require!(
         msg_slice == message,
         PredicateRegistryError::InvalidSignature
     );
+
     // If we reach here, the signature verification instruction was properly included
-    // and matches our expected parameters
+    // and matches our expected parameters. The Ed25519Program has already verified
+    // the cryptographic signature (or the transaction would have failed).
     Ok(())
 }

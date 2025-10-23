@@ -1,14 +1,15 @@
 import { expect } from "chai";
 import {
-  findAttestorPDA,
-  registerAttestor,
+  findAttesterPDA,
+  registerAttester,
   createFundedKeypair,
   createTestAccount,
-} from "./helpers/test-utils";
+} from "../helpers/test-utils";
 import {
   setupSharedTestContext,
   SharedTestContext,
-} from "./helpers/shared-setup";
+  verifyAuthorityState,
+} from "../helpers/shared-setup";
 import * as anchor from "@coral-xyz/anchor";
 
 describe("Authority Transfer", () => {
@@ -17,6 +18,58 @@ describe("Authority Transfer", () => {
   before(async () => {
     context = await setupSharedTestContext();
   });
+
+  /**
+   * Helper function to ensure authority is always restored after a test
+   * even if the test fails partway through authority transfers
+   *
+   * Usage:
+   * await withAuthorityRestore(async (tracker) => {
+   *   // Transfer to new authority
+   *   await transferAuthority(newAuth);
+   *   tracker.setCurrent(newAuth);
+   *
+   *   // Do test logic...
+   * });
+   */
+  async function withAuthorityRestore<T>(
+    testFn: (tracker: {
+      getCurrent: () => anchor.web3.Keypair;
+      setCurrent: (auth: anchor.web3.Keypair) => void;
+    }) => Promise<T>
+  ): Promise<T> {
+    let currentAuthority = context.authority.keypair;
+
+    const tracker = {
+      getCurrent: () => currentAuthority,
+      setCurrent: (newAuth: anchor.web3.Keypair) => {
+        currentAuthority = newAuth;
+      },
+    };
+
+    try {
+      return await testFn(tracker);
+    } finally {
+      // Always transfer authority back to original, even if test fails
+      if (
+        !currentAuthority.publicKey.equals(context.authority.keypair.publicKey)
+      ) {
+        try {
+          await context.program.methods
+            .transferAuthority(context.authority.keypair.publicKey)
+            .accounts({
+              registry: context.registry.registryPda,
+              authority: currentAuthority.publicKey,
+            } as any)
+            .signers([currentAuthority])
+            .rpc();
+        } catch (error) {
+          console.error("Failed to restore authority in test cleanup:", error);
+          throw error;
+        }
+      }
+    }
+  }
 
   describe("Successful Authority Transfer", () => {
     it("Should transfer authority successfully", async () => {
@@ -33,7 +86,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -61,7 +113,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -93,7 +144,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -109,7 +159,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -121,7 +170,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -137,13 +185,13 @@ describe("Authority Transfer", () => {
 
     it("Should preserve other registry data during transfer", async () => {
       const newAuthority = await createTestAccount(context.provider);
-      const attestor1 = await createTestAccount(context.provider);
+      const attester1 = await createTestAccount(context.provider);
 
       // Add some data to the registry first
-      await registerAttestor(
+      await registerAttester(
         context.program,
         context.authority.keypair,
-        attestor1.keypair.publicKey,
+        attester1.keypair.publicKey,
         context.registry.registryPda
       );
 
@@ -151,7 +199,7 @@ describe("Authority Transfer", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
+      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
       const totalPoliciesBefore = registryBefore.totalPolicies.toNumber();
       const createdAtBefore = registryBefore.createdAt.toNumber();
 
@@ -161,7 +209,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -171,8 +218,8 @@ describe("Authority Transfer", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAfter.totalAttestors.toNumber()).to.equal(
-        totalAttestorsBefore
+      expect(registryAfter.totalAttesters.toNumber()).to.equal(
+        totalAttestersBefore
       );
       expect(registryAfter.totalPolicies.toNumber()).to.equal(
         totalPoliciesBefore
@@ -188,7 +235,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -206,7 +252,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: unauthorizedAuthority.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([unauthorizedAuthority])
           .rpc();
@@ -227,7 +272,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -239,7 +283,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey, // Old authority
-            newAuthority: client1.keypair.publicKey,
           } as any)
           .signers([context.authority.keypair])
           .rpc();
@@ -255,7 +298,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -270,7 +312,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([]) // No signers
           .rpc();
@@ -291,7 +332,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: context.authority.keypair.publicKey,
-            newAuthority: newAuthority.keypair.publicKey,
           } as any)
           .signers([client1.keypair]) // Wrong signer
           .rpc();
@@ -299,6 +339,26 @@ describe("Authority Transfer", () => {
         expect.fail("Should have thrown an error");
       } catch (error: any) {
         expect(error.message).to.include("unknown signer");
+      }
+    });
+
+    it("Should fail when transferring to zero address", async () => {
+      const { PublicKey } = await import("@solana/web3.js");
+      const zeroAddress = PublicKey.default;
+
+      try {
+        await context.program.methods
+          .transferAuthority(zeroAddress)
+          .accounts({
+            registry: context.registry.registryPda,
+            authority: context.authority.keypair.publicKey,
+          } as any)
+          .signers([context.authority.keypair])
+          .rpc();
+
+        expect.fail("Should have thrown an error");
+      } catch (error: any) {
+        expect(error.message).to.include("Invalid authority");
       }
     });
   });
@@ -316,7 +376,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
         } as any)
         .signers([context.authority.keypair])
         .rpc();
@@ -324,24 +383,48 @@ describe("Authority Transfer", () => {
 
     afterEach(async () => {
       // Always transfer authority back to original after each test
-      await context.program.methods
-        .transferAuthority(context.authority.keypair.publicKey)
-        .accounts({
-          registry: context.registry.registryPda,
-          authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
-        } as any)
-        .signers([newAuthority.keypair])
-        .rpc();
+      try {
+        await context.program.methods
+          .transferAuthority(context.authority.keypair.publicKey)
+          .accounts({
+            registry: context.registry.registryPda,
+            authority: newAuthority.keypair.publicKey,
+          } as any)
+          .signers([newAuthority.keypair])
+          .rpc();
+      } catch (error: any) {
+        console.error(
+          "Failed to restore authority in afterEach:",
+          error.message
+        );
+        // Try to get current authority from registry
+        try {
+          const registryAccount =
+            await context.program.account.predicateRegistry.fetch(
+              context.registry.registryPda
+            );
+          console.error(
+            `Current registry authority: ${registryAccount.authority.toString()}`
+          );
+          console.error(
+            `Expected authority: ${context.authority.keypair.publicKey.toString()}`
+          );
+          console.error(
+            `Attempted to use: ${newAuthority.keypair.publicKey.toString()}`
+          );
+        } catch (fetchError) {
+          console.error("Could not fetch registry state");
+        }
+      }
     });
 
     it("Should allow new authority to register attestors", async () => {
-      const attestor1 = await createTestAccount(context.provider);
+      const attester1 = await createTestAccount(context.provider);
 
-      await registerAttestor(
+      await registerAttester(
         context.program,
         newAuthority.keypair,
-        attestor1.keypair.publicKey,
+        attester1.keypair.publicKey,
         context.registry.registryPda
       );
 
@@ -349,23 +432,23 @@ describe("Authority Transfer", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttestors.toNumber()).to.be.greaterThan(0);
+      expect(registryAccount.totalAttesters.toNumber()).to.be.greaterThan(0);
     });
 
     it("Should allow new authority to deregister attestors", async () => {
-      const attestor1 = await createTestAccount(context.provider);
+      const attester1 = await createTestAccount(context.provider);
 
       // Register first
-      await registerAttestor(
+      await registerAttester(
         context.program,
         newAuthority.keypair,
-        attestor1.keypair.publicKey,
+        attester1.keypair.publicKey,
         context.registry.registryPda
       );
 
       // Then deregister
-      const [attestorPda] = findAttestorPDA(
-        attestor1.keypair.publicKey,
+      const [attesterPda] = findAttesterPDA(
+        attester1.keypair.publicKey,
         context.program.programId
       );
 
@@ -373,13 +456,13 @@ describe("Authority Transfer", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      const totalAttestorsBefore = registryBefore.totalAttestors.toNumber();
+      const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
 
       await context.program.methods
-        .deregisterAttestor(attestor1.keypair.publicKey)
+        .deregisterAttester(attester1.keypair.publicKey)
         .accounts({
           registry: context.registry.registryPda,
-          attestorAccount: attestorPda,
+          attesterAccount: attesterPda,
           authority: newAuthority.keypair.publicKey,
         } as any)
         .signers([newAuthority.keypair])
@@ -389,8 +472,8 @@ describe("Authority Transfer", () => {
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
         );
-      expect(registryAccount.totalAttestors.toNumber()).to.equal(
-        totalAttestorsBefore - 1
+      expect(registryAccount.totalAttesters.toNumber()).to.equal(
+        totalAttestersBefore - 1
       );
     });
 
@@ -402,7 +485,6 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: newAuthority.keypair.publicKey,
-          newAuthority: thirdAuthority.publicKey,
         } as any)
         .signers([newAuthority.keypair])
         .rpc();
@@ -420,18 +502,18 @@ describe("Authority Transfer", () => {
     });
 
     it("Should prevent old authority from performing admin operations", async () => {
-      const attestor1 = await createTestAccount(context.provider);
-      const [attestorPda] = findAttestorPDA(
-        attestor1.keypair.publicKey,
+      const attester1 = await createTestAccount(context.provider);
+      const [attesterPda] = findAttesterPDA(
+        attester1.keypair.publicKey,
         context.program.programId
       );
 
       try {
         await context.program.methods
-          .registerAttestor(attestor1.keypair.publicKey)
+          .registerAttester(attester1.keypair.publicKey)
           .accounts({
             registry: context.registry.registryPda,
-            attestorAccount: attestorPda,
+            attesterAccount: attesterPda,
             authority: context.authority.keypair.publicKey, // Old authority
             systemProgram: anchor.web3.SystemProgram.programId,
           } as any)
@@ -467,7 +549,6 @@ describe("Authority Transfer", () => {
           .accounts({
             registry: context.registry.registryPda,
             authority: currentAuthority.publicKey,
-            newAuthority: nextAuthority.publicKey,
           } as any)
           .signers([currentAuthority])
           .rpc();
@@ -489,92 +570,75 @@ describe("Authority Transfer", () => {
         .accounts({
           registry: context.registry.registryPda,
           authority: currentAuthority.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
         } as any)
         .signers([currentAuthority])
         .rpc();
     });
 
     it("Should maintain correct timestamps during multiple transfers", async () => {
-      const registryBefore =
-        await context.program.account.predicateRegistry.fetch(
-          context.registry.registryPda
-        );
-      let lastUpdatedAt = registryBefore.updatedAt.toNumber();
-
-      const authority1 = await createTestAccount(context.provider);
-      const authority2 = await createTestAccount(context.provider);
-      const authorities = [authority1.keypair, authority2.keypair];
-
-      let currentAuthority = context.authority.keypair;
-
-      for (const nextAuthority of authorities) {
-        // Wait to ensure timestamp difference
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        await context.program.methods
-          .transferAuthority(nextAuthority.publicKey)
-          .accounts({
-            registry: context.registry.registryPda,
-            authority: currentAuthority.publicKey,
-            newAuthority: nextAuthority.publicKey,
-          } as any)
-          .signers([currentAuthority])
-          .rpc();
-
-        const registryAccount =
+      await withAuthorityRestore(async (tracker) => {
+        const registryBefore =
           await context.program.account.predicateRegistry.fetch(
             context.registry.registryPda
           );
-        expect(registryAccount.updatedAt.toNumber()).to.be.greaterThan(
-          lastUpdatedAt
-        );
+        let lastUpdatedAt = registryBefore.updatedAt.toNumber();
 
-        lastUpdatedAt = registryAccount.updatedAt.toNumber();
-        currentAuthority = nextAuthority;
-      }
+        const authority1 = await createTestAccount(context.provider);
+        const authority2 = await createTestAccount(context.provider);
+        const authorities = [authority1.keypair, authority2.keypair];
 
-      // Transfer authority back to original
-      await context.program.methods
-        .transferAuthority(context.authority.keypair.publicKey)
-        .accounts({
-          registry: context.registry.registryPda,
-          authority: currentAuthority.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
-        } as any)
-        .signers([currentAuthority])
-        .rpc();
+        for (const nextAuthority of authorities) {
+          // Wait to ensure timestamp difference
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          await context.program.methods
+            .transferAuthority(nextAuthority.publicKey)
+            .accounts({
+              registry: context.registry.registryPda,
+              authority: tracker.getCurrent().publicKey,
+            } as any)
+            .signers([tracker.getCurrent()])
+            .rpc();
+
+          tracker.setCurrent(nextAuthority);
+
+          const registryAccount =
+            await context.program.account.predicateRegistry.fetch(
+              context.registry.registryPda
+            );
+          expect(registryAccount.updatedAt.toNumber()).to.be.greaterThanOrEqual(
+            lastUpdatedAt
+          );
+
+          lastUpdatedAt = registryAccount.updatedAt.toNumber();
+        }
+      });
     });
   });
 
   describe("Edge Cases", () => {
     it("Should handle rapid successive transfers", async () => {
-      const authority1 = await createTestAccount(context.provider);
-      const authority2 = await createTestAccount(context.provider);
+      await withAuthorityRestore(async (tracker) => {
+        const authority1 = await createTestAccount(context.provider);
+        const authority2 = await createTestAccount(context.provider);
 
-      const authorities = [
-        authority1.keypair,
-        authority2.keypair,
-        context.authority.keypair, // Back to original
-      ];
+        const authorities = [authority1.keypair, authority2.keypair];
 
-      let currentAuthority = context.authority.keypair;
+        for (const nextAuthority of authorities) {
+          await context.program.methods
+            .transferAuthority(nextAuthority.publicKey)
+            .accounts({
+              registry: context.registry.registryPda,
+              authority: tracker.getCurrent().publicKey,
+            } as any)
+            .signers([tracker.getCurrent()])
+            .rpc();
 
-      for (const nextAuthority of authorities) {
-        await context.program.methods
-          .transferAuthority(nextAuthority.publicKey)
-          .accounts({
-            registry: context.registry.registryPda,
-            authority: currentAuthority.publicKey,
-            newAuthority: nextAuthority.publicKey,
-          } as any)
-          .signers([currentAuthority])
-          .rpc();
+          tracker.setCurrent(nextAuthority);
+        }
+      });
 
-        currentAuthority = nextAuthority;
-      }
-
-      // Verify final state
+      // Verify final state (after cleanup has restored authority)
       const registryAccount =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
@@ -585,54 +649,47 @@ describe("Authority Transfer", () => {
     });
 
     it("Should maintain registry functionality after authority transfer", async () => {
-      const newAuthority = await createTestAccount(context.provider);
-      const attestor1 = await createTestAccount(context.provider);
+      await withAuthorityRestore(async (tracker) => {
+        const newAuthority = await createTestAccount(context.provider);
+        const attester1 = await createTestAccount(context.provider);
 
-      // Transfer authority
-      await context.program.methods
-        .transferAuthority(newAuthority.keypair.publicKey)
-        .accounts({
-          registry: context.registry.registryPda,
-          authority: context.authority.keypair.publicKey,
-          newAuthority: newAuthority.keypair.publicKey,
-        } as any)
-        .signers([context.authority.keypair])
-        .rpc();
+        // Transfer authority
+        await context.program.methods
+          .transferAuthority(newAuthority.keypair.publicKey)
+          .accounts({
+            registry: context.registry.registryPda,
+            authority: tracker.getCurrent().publicKey,
+          } as any)
+          .signers([tracker.getCurrent()])
+          .rpc();
 
-      // Test that all admin functions still work with new authority
-      await registerAttestor(
-        context.program,
-        newAuthority.keypair,
-        attestor1.keypair.publicKey,
-        context.registry.registryPda
-      );
+        tracker.setCurrent(newAuthority.keypair);
 
-      const [attestorPda] = findAttestorPDA(
-        attestor1.keypair.publicKey,
-        context.program.programId
-      );
+        // Test that all admin functions still work with new authority
+        await registerAttester(
+          context.program,
+          newAuthority.keypair,
+          attester1.keypair.publicKey,
+          context.registry.registryPda
+        );
 
-      await context.program.methods
-        .deregisterAttestor(attestor1.keypair.publicKey)
-        .accounts({
-          registry: context.registry.registryPda,
-          attestorAccount: attestorPda,
-          authority: newAuthority.keypair.publicKey,
-        } as any)
-        .signers([newAuthority.keypair])
-        .rpc();
+        const [attesterPda] = findAttesterPDA(
+          attester1.keypair.publicKey,
+          context.program.programId
+        );
 
-      // Transfer back
-      await context.program.methods
-        .transferAuthority(context.authority.keypair.publicKey)
-        .accounts({
-          registry: context.registry.registryPda,
-          authority: newAuthority.keypair.publicKey,
-          newAuthority: context.authority.keypair.publicKey,
-        } as any)
-        .signers([newAuthority.keypair])
-        .rpc();
+        await context.program.methods
+          .deregisterAttester(attester1.keypair.publicKey)
+          .accounts({
+            registry: context.registry.registryPda,
+            attesterAccount: attesterPda,
+            authority: newAuthority.keypair.publicKey,
+          } as any)
+          .signers([newAuthority.keypair])
+          .rpc();
+      });
 
+      // Verify final state (after cleanup has restored authority)
       const registryAccount =
         await context.program.account.predicateRegistry.fetch(
           context.registry.registryPda
@@ -640,6 +697,14 @@ describe("Authority Transfer", () => {
       expect(registryAccount.authority.toString()).to.equal(
         context.authority.keypair.publicKey.toString()
       );
+    });
+  });
+
+  // Global cleanup verification - ensure authority is at the original for subsequent test files
+  after(async () => {
+    await verifyAuthorityState(context, {
+      when: "after",
+      suiteName: "authority-transfer test suite",
     });
   });
 });

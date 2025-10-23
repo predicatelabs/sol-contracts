@@ -10,7 +10,7 @@ This directory contains scripts to initialize the predicate registry and counter
 4. **Environment Variables** (optional):
    - `ANCHOR_PROVIDER_URL`: Solana cluster URL (defaults to `http://127.0.0.1:8899`)
    - `ANCHOR_WALLET`: Path to wallet keypair (defaults to `scripts/test-keys/authority.json`)
-   - `ATTESTOR_WALLET`: Path to attestor keypair for increment script (defaults to `scripts/test-keys/attestor-1.json`)
+   - `ATTESTER_WALLET`: Path to attester keypair for increment script (defaults to `scripts/test-keys/attester-1.json`)
    - `USE_TEST_KEYS`: Enable/disable test key features (defaults to `true`)
 
 ## Scripts
@@ -25,10 +25,10 @@ This script will:
 - Load the authority keypair from your configured wallet (defaults to test-keys/authority.json)
 - Automatically request airdrop if balance is low (localnet/devnet only)
 - Initialize the predicate registry if it doesn't exist
-- Register all test attestors automatically (when using test keys)
+- Register all test attesters automatically (when using test keys)
 - Display registry information including PDA, authority, and statistics
 
-**Output**: Registry PDA address, initialization status, and attestor registration summary
+**Output**: Registry PDA address, initialization status, and attester registration summary
 
 ### 2. Initialize Counter Program
 
@@ -46,23 +46,23 @@ This script will:
 
 **Output**: Counter PDA address and initialization status
 
-### 3. Register Attestor
+### 3. Register Attester
 
 ```bash
-export ATTESTOR_PUBKEY=<attestor-public-key>
-npx ts-node scripts/register-attestor.ts
+export ATTESTER_PUBKEY=<attester-public-key>
+npx ts-node scripts/register-attester.ts
 ```
 
 This script will:
 - Load the authority keypair from your configured wallet
-- Accept the attestor public key from the `ATTESTOR_PUBKEY` environment variable
+- Accept the attester public key from the `ATTESTER_PUBKEY` environment variable
 - Verify that the predicate registry is initialized
-- Register the attestor if not already registered
-- Display attestor information and updated registry statistics
+- Register the attester if not already registered
+- Display attester information and updated registry statistics
 
-**Required Environment Variable**: `ATTESTOR_PUBKEY` - The public key of the attestor to register
+**Required Environment Variable**: `ATTESTER_PUBKEY` - The public key of the attester to register
 
-**Output**: Attestor PDA address, registration status, and registry statistics
+**Output**: Attester PDA address, registration status, and registry statistics
 
 ### 4. Increment Counter
 
@@ -72,28 +72,28 @@ npx ts-node scripts/increment-counter.ts
 
 This script will:
 - Load the counter owner keypair (defaults to test-keys/authority.json)
-- Load an attestor keypair (defaults to test-keys/attestor-1.json)
+- Load an attester keypair (defaults to test-keys/attester-1.json)
 - Automatically request airdrop if balance is low (localnet/devnet only)
-- Verify all prerequisites (registry, counter, attestor, policy)
-- Create and sign a task for the increment operation
+- Verify all prerequisites (registry, counter, attester, policy)
+- Create and sign a statement for the increment operation
 - Execute the increment with full predicate validation
 - Display the counter value change and transaction details
 
 **Output**: Counter increment result with before/after values and transaction signature
 
-### 5. Generate Test Attestor (Utility)
+### 5. Generate Test Attester (Utility)
 
 ```bash
-npx ts-node --transpile-only scripts/generate-test-attestor.ts [--save]
+npx ts-node --transpile-only scripts/generate-test-attester.ts [--save]
 ```
 
 This utility script will:
 - Generate a new keypair for testing purposes
 - Display the public key that can be used for registration
 - Optionally save the keypair to a file (with `--save` flag)
-- Provide usage instructions for the register-attestor script
+- Provide usage instructions for the register-attester script
 
-**Output**: Attestor public key and usage instructions
+**Output**: Attester public key and usage instructions
 
 ### 6. Generate Test Keys
 
@@ -104,12 +104,12 @@ npx ts-node --transpile-only scripts/generate-test-keys.ts
 This script will:
 - Create a `test-keys/` directory in the scripts folder
 - Generate 1 authority keypair (`authority`) for registry initialization
-- Generate 3 attestor keypairs (`attestor-1`, `attestor-2`, `attestor-3`) for registration
+- Generate 3 attester keypairs (`attester-1`, `attester-2`, `attester-3`) for registration
 - Save each keypair as a JSON file
 - Create a README.md with all public keys and usage commands
 - Provide quick copy-paste commands for setup and registration
 
-**Output**: 1 authority key + 3 attestor keys with comprehensive documentation
+**Output**: 1 authority key + 3 attester keys with comprehensive documentation
 
 ## Automatic Features
 
@@ -122,8 +122,8 @@ When using test keys (default behavior), the scripts provide enhanced automation
 - Clear warnings when using test keys for development
 
 ### 🤖 **Auto-Registration**
-- `initialize-predicate-registry.ts` automatically registers all 3 test attestors
-- Skips registration if attestors are already registered (idempotent)
+- `initialize-predicate-registry.ts` automatically registers all 3 test attesters
+- Skips registration if attesters are already registered (idempotent)
 - Provides detailed registration summary
 
 ### 🛡️ **Safety Features**
@@ -139,7 +139,7 @@ The scripts are designed to work together in a specific sequence for a complete 
 # 1. Generate test keys (one-time setup)
 npx ts-node --transpile-only scripts/generate-test-keys.ts
 
-# 2. Initialize predicate registry + register attestors
+# 2. Initialize predicate registry + register attesters
 npx ts-node scripts/initialize-predicate-registry.ts
 
 # 3. Initialize counter with policy
@@ -150,9 +150,9 @@ npx ts-node scripts/increment-counter.ts
 ```
 
 This workflow demonstrates the complete predicate validation flow:
-- **Registry Setup**: Authority initializes registry and registers attestors
+- **Registry Setup**: Authority initializes registry and registers attesters
 - **Client Setup**: Counter owner sets policy and initializes counter
-- **Validation Flow**: Attestor signs tasks, counter validates with predicate registry
+- **Validation Flow**: Attester signs statements, counter validates with predicate registry
 
 ## Usage Examples
 
@@ -168,10 +168,10 @@ npx ts-node scripts/initialize-predicate-registry.ts
 # Initialize counter
 npx ts-node scripts/initialize-counter.ts
 
-# Generate test keys (creates 1 authority + 3 attestors)
+# Generate test keys (creates 1 authority + 3 attesters)
 npx ts-node --transpile-only scripts/generate-test-keys.ts
 
-# Initialize predicate registry (automatically uses test authority and registers attestors)
+# Initialize predicate registry (automatically uses test authority and registers attesters)
 npx ts-node scripts/initialize-predicate-registry.ts
 
 # Initialize counter (automatically uses test authority)
@@ -197,10 +197,10 @@ npx ts-node scripts/initialize-predicate-registry.ts
 # Initialize counter
 npx ts-node scripts/initialize-counter.ts
 
-# Generate test keys (creates 1 authority + 3 attestors)
+# Generate test keys (creates 1 authority + 3 attesters)
 npx ts-node --transpile-only scripts/generate-test-keys.ts
 
-# Initialize predicate registry (automatically uses test authority and registers attestors)
+# Initialize predicate registry (automatically uses test authority and registers attesters)
 npx ts-node scripts/initialize-predicate-registry.ts
 
 # Initialize counter (automatically uses test authority)
@@ -226,10 +226,10 @@ npx ts-node scripts/initialize-predicate-registry.ts
 # Initialize counter
 npx ts-node scripts/initialize-counter.ts
 
-# Generate test keys (creates 1 authority + 3 attestors)
+# Generate test keys (creates 1 authority + 3 attesters)
 npx ts-node --transpile-only scripts/generate-test-keys.ts
 
-# Initialize predicate registry (automatically uses test authority and registers attestors)
+# Initialize predicate registry (automatically uses test authority and registers attesters)
 npx ts-node scripts/initialize-predicate-registry.ts
 
 # Initialize counter (automatically uses test authority)
@@ -274,8 +274,8 @@ npx ts-node scripts/increment-counter.ts
    - Run `initialize-predicate-registry.ts` first
    - Verify the registry was deployed correctly
 
-4. **"ATTESTOR_PUBKEY environment variable is required"**
-   - Set the attestor public key: `export ATTESTOR_PUBKEY=<public-key>`
+4. **"ATTESTER_PUBKEY environment variable is required"**
+   - Set the attester public key: `export ATTESTER_PUBKEY=<public-key>`
    - Ensure the public key is valid base58 encoded format
 
 5. **Connection errors**

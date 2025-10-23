@@ -2,28 +2,26 @@
 
 /**
  * Increment Counter Script
- * 
+ *
  * This script demonstrates the predicate validation flow by incrementing a counter
  * with attestation validation. It will:
- * 
+ *
  * 1. Load the counter owner keypair (defaults to test authority)
- * 2. Load an attestor keypair (defaults to attestor-1)
- * 3. Create a task for the increment operation
- * 4. Sign the task with the attestor
+ * 2. Load an attester keypair (defaults to attester-1)
+ * 3. Create a statement for the increment operation
+ * 4. Sign the statement with the attester
  * 5. Execute the increment with predicate validation
  * 6. Display the updated counter value
  */
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { 
-  Keypair, 
-  PublicKey, 
-  SystemProgram,
-  TransactionInstruction,
+import {
+  Keypair,
+  PublicKey,
   Transaction,
   Ed25519Program,
-  Connection
+  Connection,
 } from "@solana/web3.js";
 import { PredicateRegistry } from "../target/types/predicate_registry";
 import { Counter } from "../target/types/counter";
@@ -34,15 +32,18 @@ import * as path from "path";
 
 // Configuration
 const CLUSTER_URL = process.env.ANCHOR_PROVIDER_URL || "http://127.0.0.1:8899";
-const OWNER_WALLET_PATH = process.env.ANCHOR_WALLET || path.join(__dirname, "test-keys", "authority.json");
-const ATTESTOR_WALLET_PATH = process.env.ATTESTOR_WALLET || path.join(__dirname, "test-keys", "attestor-1.json");
-const USE_TEST_KEYS = process.env.USE_TEST_KEYS !== "false"; // Default to true
+const OWNER_WALLET_PATH =
+  process.env.ANCHOR_WALLET ||
+  path.join(__dirname, "test-keys", "authority.json");
+const ATTESTER_WALLET_PATH =
+  process.env.ATTESTER_WALLET ||
+  path.join(__dirname, "test-keys", "attester-1.json");
 const DEFAULT_POLICY = "counter-increment-policy-v1";
 
 interface IncrementResult {
   counterPda: PublicKey;
   owner: PublicKey;
-  attestor: PublicKey;
+  attester: PublicKey;
   oldValue: number;
   newValue: number;
   transactionSignature: string;
@@ -51,67 +52,88 @@ interface IncrementResult {
 /**
  * Load a keypair from file with airdrop support
  */
-async function loadKeypair(walletPath: string, connection: Connection, keyType: string): Promise<Keypair> {
+async function loadKeypair(
+  walletPath: string,
+  connection: Connection,
+  keyType: string
+): Promise<Keypair> {
   // Handle tilde expansion
   if (walletPath.startsWith("~/")) {
     walletPath = path.join(process.env.HOME || "", walletPath.slice(2));
   }
-  
+
   // Check if using test keys
   const isUsingTestKeys = walletPath.includes("test-keys");
-  
+
   let keypair: Keypair;
   try {
     const keypairData = JSON.parse(fs.readFileSync(walletPath, "utf8"));
     keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
-    
+
     if (isUsingTestKeys) {
-      console.log(`🔑 Using test ${keyType} key from ${path.basename(walletPath)}`);
+      console.log(
+        `🔑 Using test ${keyType} key from ${path.basename(walletPath)}`
+      );
       console.log("⚠️  This is for development/testing only!");
     }
   } catch (error) {
     if (isUsingTestKeys) {
       throw new Error(
         `Failed to load test ${keyType} keypair from ${walletPath}. ` +
-        `Please run 'npx ts-node --transpile-only scripts/generate-test-keys.ts' first.`
+          `Please run 'npx ts-node --transpile-only scripts/generate-test-keys.ts' first.`
       );
     }
-    throw new Error(`Failed to load ${keyType} keypair from ${walletPath}: ${error}`);
+    throw new Error(
+      `Failed to load ${keyType} keypair from ${walletPath}: ${error}`
+    );
   }
-  
+
   // Check balance and request airdrop if needed (for owner only)
   if (keyType === "owner") {
     const balance = await connection.getBalance(keypair.publicKey);
     const minBalance = 0.1 * anchor.web3.LAMPORTS_PER_SOL; // 0.1 SOL minimum
-    
-    console.log(`💰 ${keyType} balance: ${balance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
-    
+
+    console.log(
+      `💰 ${keyType} balance: ${balance / anchor.web3.LAMPORTS_PER_SOL} SOL`
+    );
+
     if (balance < minBalance) {
       console.log("💸 Balance is low, requesting airdrop...");
-      
+
       try {
         // Check if we're on a network that supports airdrops
-        const isLocalOrDevnet = CLUSTER_URL.includes("127.0.0.1") || 
-                               CLUSTER_URL.includes("localhost") || 
-                               CLUSTER_URL.includes("devnet");
-        
+        const isLocalOrDevnet =
+          CLUSTER_URL.includes("127.0.0.1") ||
+          CLUSTER_URL.includes("localhost") ||
+          CLUSTER_URL.includes("devnet");
+
         if (isLocalOrDevnet) {
           const signature = await connection.requestAirdrop(
             keypair.publicKey,
             2 * anchor.web3.LAMPORTS_PER_SOL // Request 2 SOL
           );
-          
+
           console.log(`   Airdrop requested: ${signature}`);
           console.log("   Waiting for confirmation...");
-          
+
           await connection.confirmTransaction(signature);
-          
+
           const newBalance = await connection.getBalance(keypair.publicKey);
-          console.log(`✅ Airdrop successful! New balance: ${newBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+          console.log(
+            `✅ Airdrop successful! New balance: ${
+              newBalance / anchor.web3.LAMPORTS_PER_SOL
+            } SOL`
+          );
         } else {
-          console.log("⚠️  Cannot request airdrop on this network. Please fund the account manually.");
+          console.log(
+            "⚠️  Cannot request airdrop on this network. Please fund the account manually."
+          );
           console.log(`   Account: ${keypair.publicKey.toString()}`);
-          console.log(`   Required: At least ${minBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+          console.log(
+            `   Required: At least ${
+              minBalance / anchor.web3.LAMPORTS_PER_SOL
+            } SOL`
+          );
         }
       } catch (error) {
         console.log(`⚠️  Airdrop failed: ${error}`);
@@ -119,7 +141,7 @@ async function loadKeypair(walletPath: string, connection: Connection, keyType: 
       }
     }
   }
-  
+
   return keypair;
 }
 
@@ -131,15 +153,19 @@ async function setupClients(): Promise<{
   counterProgram: Program<Counter>;
   provider: anchor.AnchorProvider;
   owner: Keypair;
-  attestor: Keypair;
+  attester: Keypair;
 }> {
   // Setup connection first
   const connection = new Connection(CLUSTER_URL, "confirmed");
-  
+
   // Load keypairs
   const owner = await loadKeypair(OWNER_WALLET_PATH, connection, "owner");
-  const attestor = await loadKeypair(ATTESTOR_WALLET_PATH, connection, "attestor");
-  
+  const attester = await loadKeypair(
+    ATTESTER_WALLET_PATH,
+    connection,
+    "attester"
+  );
+
   // Setup provider
   const wallet = new anchor.Wallet(owner);
   const provider = new anchor.AnchorProvider(connection, wallet, {
@@ -148,17 +174,20 @@ async function setupClients(): Promise<{
   anchor.setProvider(provider);
 
   // Load programs
-  const predicateProgram = anchor.workspace.PredicateRegistry as Program<PredicateRegistry>;
+  const predicateProgram = anchor.workspace
+    .PredicateRegistry as Program<PredicateRegistry>;
   const counterProgram = anchor.workspace.Counter as Program<Counter>;
 
   console.log("✅ Clients setup complete:");
   console.log(`   Cluster: ${CLUSTER_URL}`);
-  console.log(`   Predicate Registry: ${predicateProgram.programId.toString()}`);
+  console.log(
+    `   Predicate Registry: ${predicateProgram.programId.toString()}`
+  );
   console.log(`   Counter Program: ${counterProgram.programId.toString()}`);
   console.log(`   Owner: ${owner.publicKey.toString()}`);
-  console.log(`   Attestor: ${attestor.publicKey.toString()}`);
+  console.log(`   Attester: ${attester.publicKey.toString()}`);
 
-  return { predicateProgram, counterProgram, provider, owner, attestor };
+  return { predicateProgram, counterProgram, provider, owner, attester };
 }
 
 /**
@@ -168,11 +197,11 @@ function findPDAs(
   predicateProgram: Program<PredicateRegistry>,
   counterProgram: Program<Counter>,
   owner: PublicKey,
-  attestor: PublicKey
+  attester: PublicKey
 ): {
   registryPda: PublicKey;
   counterPda: PublicKey;
-  attestorPda: PublicKey;
+  attesterPda: PublicKey;
   policyPda: PublicKey;
 } {
   // Registry PDA
@@ -187,9 +216,9 @@ function findPDAs(
     counterProgram.programId
   );
 
-  // Attestor PDA
-  const [attestorPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("attestor"), attestor.toBuffer()],
+  // Attester PDA
+  const [attesterPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("attester"), attester.toBuffer()],
     predicateProgram.programId
   );
 
@@ -202,10 +231,10 @@ function findPDAs(
   console.log("📍 PDAs calculated:");
   console.log(`   Registry: ${registryPda.toString()}`);
   console.log(`   Counter: ${counterPda.toString()}`);
-  console.log(`   Attestor: ${attestorPda.toString()}`);
+  console.log(`   Attester: ${attesterPda.toString()}`);
   console.log(`   Policy: ${policyPda.toString()}`);
 
-  return { registryPda, counterPda, attestorPda, policyPda };
+  return { registryPda, counterPda, attesterPda, policyPda };
 }
 
 /**
@@ -216,55 +245,53 @@ async function getCounterValue(
   counterPda: PublicKey
 ): Promise<number> {
   try {
-    const counterAccount = await counterProgram.account.counterAccount.fetch(counterPda);
+    const counterAccount = await counterProgram.account.counterAccount.fetch(
+      counterPda
+    );
     return counterAccount.value.toNumber();
   } catch (error) {
-    throw new Error(`Counter not found. Please run initialize-counter.ts first.`);
+    throw new Error(
+      `Counter not found. Please run initialize-counter.ts first.`
+    );
   }
 }
 
 /**
- * Create a task for counter increment operation
+ * Create a statement for counter increment operation
  */
-function createIncrementTask(owner: PublicKey, counterProgram: Program<Counter>): any {
+function createIncrementStatement(
+  owner: PublicKey,
+  counterProgram: Program<Counter>
+): any {
   const uuid = crypto.randomBytes(16);
   const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-  
-  // Create policy buffer with exact length needed (200 bytes)
-  const policyBuffer = Buffer.alloc(200);
-  Buffer.from(DEFAULT_POLICY, "utf8").copy(policyBuffer);
-  
+
   // Encode increment function signature
   const encodedSigAndArgs = Buffer.from("increment()");
-  
+
   return {
     uuid: Array.from(uuid),
     msgSender: owner,
     target: counterProgram.programId,
     msgValue: new anchor.BN(0), // No SOL value for increment
     encodedSigAndArgs: encodedSigAndArgs,
-    policy: Array.from(policyBuffer),
+    policyId: DEFAULT_POLICY,
     expiration: new anchor.BN(expiration),
   };
 }
 
 /**
- * Create message hash for task (matching Rust implementation)
+ * Create message hash for statement (matching Rust implementation)
  */
-function createMessageHash(task: any, validatorPubkey: PublicKey): Buffer {
-  // Get policy data - trim null bytes like get_policy() in Rust
-  const policyData = Buffer.from(task.policy);
-  const policyEnd = policyData.indexOf(0);
-  const trimmedPolicy = policyEnd === -1 ? policyData : policyData.subarray(0, policyEnd);
-  
+function createMessageHash(statement: any, validatorPubkey: PublicKey): Buffer {
   const data = Buffer.concat([
-    Buffer.from(task.uuid),
-    task.msgSender.toBuffer(),
+    Buffer.from(statement.uuid),
+    statement.msgSender.toBuffer(),
     validatorPubkey.toBuffer(), // validator key (counter program as validator)
-    Buffer.from(task.msgValue.toBuffer("le", 8)),
-    Buffer.from(task.encodedSigAndArgs),
-    trimmedPolicy,
-    Buffer.from(task.expiration.toBuffer("le", 8)),
+    Buffer.from(statement.msgValue.toBuffer("le", 8)),
+    Buffer.from(statement.encodedSigAndArgs),
+    Buffer.from(statement.policyId, "utf8"),
+    Buffer.from(statement.expiration.toBuffer("le", 8)),
   ]);
 
   // Hash the data using SHA-256 (Solana's hash function)
@@ -274,21 +301,30 @@ function createMessageHash(task: any, validatorPubkey: PublicKey): Buffer {
 /**
  * Create Ed25519 signature for attestation
  */
-function createSignature(task: any, attestorKeypair: Keypair, validatorPubkey: PublicKey): Uint8Array {
-  const messageHash = createMessageHash(task, validatorPubkey);
-  
+function createSignature(
+  statement: any,
+  attesterKeypair: Keypair,
+  validatorPubkey: PublicKey
+): Uint8Array {
+  const messageHash = createMessageHash(statement, validatorPubkey);
+
   // Sign with Ed25519 using NaCl/TweetNaCl
-  const signature = nacl.sign.detached(messageHash, attestorKeypair.secretKey);
+  const signature = nacl.sign.detached(messageHash, attesterKeypair.secretKey);
   return signature;
 }
 
 /**
- * Create attestation for the task
+ * Create attestation for the statement
  */
-function createAttestation(uuid: Uint8Array, attestorKeypair: Keypair, expiration: number, signature: Uint8Array): any {
+function createAttestation(
+  uuid: Uint8Array,
+  attesterKeypair: Keypair,
+  expiration: number,
+  signature: Uint8Array
+): any {
   return {
     uuid: Array.from(uuid),
-    attestor: attestorKeypair.publicKey,
+    attester: attesterKeypair.publicKey,
     signature: Array.from(signature),
     expiration: new anchor.BN(expiration),
   };
@@ -302,11 +338,11 @@ async function incrementCounter(
   counterProgram: Program<Counter>,
   predicateProgram: Program<PredicateRegistry>,
   owner: Keypair,
-  attestor: Keypair,
+  attester: Keypair,
   pdas: {
     registryPda: PublicKey;
     counterPda: PublicKey;
-    attestorPda: PublicKey;
+    attesterPda: PublicKey;
     policyPda: PublicKey;
   }
 ): Promise<IncrementResult> {
@@ -316,41 +352,51 @@ async function incrementCounter(
   const oldValue = await getCounterValue(counterProgram, pdas.counterPda);
   console.log(`   Current counter value: ${oldValue}`);
 
-  // Create task for increment operation
-  const task = createIncrementTask(owner.publicKey, counterProgram);
-  
+  // Create statement for increment operation
+  const statement = createIncrementStatement(owner.publicKey, counterProgram);
+
   // Create signature - use owner as validator (the one calling increment)
-  const signature = createSignature(task, attestor, owner.publicKey);
-  
+  const signature = createSignature(statement, attester, owner.publicKey);
+
   // Create attestation
   const attestation = createAttestation(
-    Buffer.from(task.uuid), 
-    attestor, 
-    task.expiration.toNumber(), 
+    Buffer.from(statement.uuid),
+    attester,
+    statement.expiration.toNumber(),
     signature
   );
 
+  // Calculate used UUID PDA (for replay protection)
+  const [usedUuidPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("used_uuid"), Buffer.from(statement.uuid)],
+    predicateProgram.programId
+  );
+
+  console.log(`   UUID PDA (replay protection): ${usedUuidPda.toString()}`);
+
   // Create message hash for Ed25519 verification instruction
-  const messageHash = createMessageHash(task, owner.publicKey);
+  const messageHash = createMessageHash(statement, owner.publicKey);
 
   // Create Ed25519 verification instruction
   const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-    publicKey: attestor.publicKey.toBytes(),
+    publicKey: attester.publicKey.toBytes(),
     message: messageHash,
     signature: signature,
   });
 
   // Create the increment instruction
   const incrementInstruction = await counterProgram.methods
-    .increment(task, attestor.publicKey, attestation)
+    .increment(statement, attester.publicKey, attestation)
     .accounts({
       counter: pdas.counterPda,
       owner: owner.publicKey,
       predicateRegistry: pdas.registryPda,
-      attestorAccount: pdas.attestorPda,
+      attesterAccount: pdas.attesterPda,
       policyAccount: pdas.policyPda,
+      usedUuidAccount: usedUuidPda,
       instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
       predicateRegistryProgram: predicateProgram.programId,
+      systemProgram: anchor.web3.SystemProgram.programId,
     } as any)
     .instruction();
 
@@ -373,7 +419,7 @@ async function incrementCounter(
   return {
     counterPda: pdas.counterPda,
     owner: owner.publicKey,
-    attestor: attestor.publicKey,
+    attester: attester.publicKey,
     oldValue,
     newValue,
     transactionSignature: tx,
@@ -389,7 +435,7 @@ async function verifyPrerequisites(
   pdas: {
     registryPda: PublicKey;
     counterPda: PublicKey;
-    attestorPda: PublicKey;
+    attesterPda: PublicKey;
     policyPda: PublicKey;
   }
 ): Promise<void> {
@@ -400,7 +446,9 @@ async function verifyPrerequisites(
     await predicateProgram.account.predicateRegistry.fetch(pdas.registryPda);
     console.log("✅ Predicate registry is initialized");
   } catch (error) {
-    throw new Error("Predicate registry not found. Please run initialize-predicate-registry.ts first.");
+    throw new Error(
+      "Predicate registry not found. Please run initialize-predicate-registry.ts first."
+    );
   }
 
   // Check if counter exists
@@ -408,19 +456,24 @@ async function verifyPrerequisites(
     await counterProgram.account.counterAccount.fetch(pdas.counterPda);
     console.log("✅ Counter is initialized");
   } catch (error) {
-    throw new Error("Counter not found. Please run initialize-counter.ts first.");
+    throw new Error(
+      "Counter not found. Please run initialize-counter.ts first."
+    );
   }
 
-  // Check if attestor is registered
+  // Check if attester is registered
   try {
-    const attestorAccount = await predicateProgram.account.attestorAccount.fetch(pdas.attestorPda);
-    if (attestorAccount.isRegistered) {
-      console.log("✅ Attestor is registered");
+    const attesterAccount =
+      await predicateProgram.account.attesterAccount.fetch(pdas.attesterPda);
+    if (attesterAccount.isRegistered) {
+      console.log("✅ Attester is registered");
     } else {
-      throw new Error("Attestor is not registered");
+      throw new Error("Attester is not registered");
     }
   } catch (error) {
-    throw new Error("Attestor not registered. Please run initialize-predicate-registry.ts first.");
+    throw new Error(
+      "Attester not registered. Please run initialize-predicate-registry.ts first."
+    );
   }
 
   // Check if policy exists
@@ -428,7 +481,9 @@ async function verifyPrerequisites(
     await predicateProgram.account.policyAccount.fetch(pdas.policyPda);
     console.log("✅ Policy is set");
   } catch (error) {
-    throw new Error("Policy not found. Please run initialize-counter.ts first.");
+    throw new Error(
+      "Policy not found. Please run initialize-counter.ts first."
+    );
   }
 }
 
@@ -437,36 +492,50 @@ async function verifyPrerequisites(
  */
 async function main(): Promise<IncrementResult> {
   console.log("🚀 Counter Increment Script");
-  console.log("=" .repeat(50));
+  console.log("=".repeat(50));
 
   try {
     // Setup clients
-    const { predicateProgram, counterProgram, provider, owner, attestor } = await setupClients();
+    const { predicateProgram, counterProgram, provider, owner, attester } =
+      await setupClients();
 
     // Find PDAs
-    const pdas = findPDAs(predicateProgram, counterProgram, owner.publicKey, attestor.publicKey);
+    const pdas = findPDAs(
+      predicateProgram,
+      counterProgram,
+      owner.publicKey,
+      attester.publicKey
+    );
 
     // Verify prerequisites
     await verifyPrerequisites(predicateProgram, counterProgram, pdas);
 
-    console.log("\n" + "=" .repeat(50));
+    console.log("\n" + "=".repeat(50));
     console.log("🔢 Incrementing Counter with Predicate Validation");
 
     // Increment counter with attestation
-    const result = await incrementCounter(provider, counterProgram, predicateProgram, owner, attestor, pdas);
+    const result = await incrementCounter(
+      provider,
+      counterProgram,
+      predicateProgram,
+      owner,
+      attester,
+      pdas
+    );
 
-    console.log("\n" + "=" .repeat(50));
+    console.log("\n" + "=".repeat(50));
     console.log("✅ Counter increment completed successfully!");
     console.log(`\n📊 Summary:`);
     console.log(`   Counter PDA: ${result.counterPda.toString()}`);
     console.log(`   Owner: ${result.owner.toString()}`);
-    console.log(`   Attestor: ${result.attestor.toString()}`);
+    console.log(`   Attester: ${result.attester.toString()}`);
     console.log(`   Value Change: ${result.oldValue} → ${result.newValue}`);
     console.log(`   Transaction: ${result.transactionSignature}`);
-    console.log(`\n🎉 Predicate validation was successfully used to protect the increment operation!`);
+    console.log(
+      `\n🎉 Predicate validation was successfully used to protect the increment operation!`
+    );
 
     return result;
-
   } catch (error) {
     console.error("❌ Error:", error);
     process.exit(1);

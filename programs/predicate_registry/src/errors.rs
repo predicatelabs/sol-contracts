@@ -8,17 +8,21 @@ use anchor_lang::prelude::*;
 /// Custom error codes for the predicate registry program
 #[error_code]
 pub enum PredicateRegistryError {
-    /// Error when trying to register an already registered attestor
-    #[msg("Attestor already registered: The attestor is already registered in the registry")]
-    AttestorAlreadyRegistered,
+    /// Error when trying to register an already registered attester
+    #[msg("Attester already registered: The attester is already registered in the registry")]
+    AttesterAlreadyRegistered,
     
-    /// Error when trying to deregister a non-registered attestor
-    #[msg("Attestor not registered: The attestor is not registered in the registry")]
-    AttestorNotRegistered,
+    /// Error when trying to deregister a non-registered attester
+    #[msg("Attester not registered: The attester is not registered in the registry")]
+    AttesterNotRegistered,
     
     /// Error when unauthorized user tries to perform an action
     #[msg("Unauthorized: Only the authority can perform this action")]
     Unauthorized,
+    
+    /// Error when an invalid authority address is provided
+    #[msg("Invalid authority: The provided authority address is invalid")]
+    InvalidAuthority,
     
     /// Error when trying to initialize an already initialized registry
     #[msg("Already initialized: Registry has already been initialized")]
@@ -41,42 +45,49 @@ pub enum PredicateRegistryError {
     AttestationExpired,
     
     
-    /// Error when task ID doesn't match attestation ID
-    #[msg("Task ID mismatch: Task UUID does not match attestation UUID")]
-    TaskIdMismatch,
+    /// Error when statement ID doesn't match attestation ID
+    #[msg("Statement ID mismatch: Statement UUID does not match attestation UUID")]
+    StatementIdMismatch,
     
-    /// Error when task expiration doesn't match attestation expiration
-    #[msg("Expiration mismatch: Task expiration does not match attestation expiration")]
+    /// Error when statement expiration doesn't match attestation expiration
+    #[msg("Expiration mismatch: Statement expiration does not match attestation expiration")]
     ExpirationMismatch,
     
     /// Error when signature verification fails
     #[msg("Invalid signature: The attestation signature is invalid")]
     InvalidSignature,
     
-    /// Error when attestor is not registered for validation
-    #[msg("Attestor not registered: The attestor is not registered for validation")]
-    AttestorNotRegisteredForValidation,
+    /// Error when attester is not registered for validation
+    #[msg("Attester not registered: The attester is not registered for validation")]
+    AttesterNotRegisteredForValidation,
     
-    /// Error when policy string is too long
-    #[msg("Policy too long: Policy string exceeds maximum allowed length")]
-    PolicyTooLong,
+    /// Error when policy ID string is too long
+    #[msg("Policy ID too long: Policy ID string exceeds maximum allowed length")]
+    PolicyIdTooLong,
     
+    /// Error when policy ID is empty or invalid
+    #[msg("Invalid policy ID: Policy ID cannot be empty")]
+    InvalidPolicyId,
     
-    /// Error when UUID string is too long
-    #[msg("UUID too long: UUID string exceeds maximum allowed length")]
-    UuidTooLong,
+    /// Error when policy IDs don't match
+    #[msg("Policy ID mismatch: Statement policy ID does not match account policy ID")]
+    PolicyIdMismatch,
     
-    /// Error when policy is empty or invalid
-    #[msg("Invalid policy: Policy cannot be empty")]
-    InvalidPolicy,
+    /// Error when UUID has already been used (replay attack prevention)
+    #[msg("UUID already used: This attestation has already been validated")]
+    UuidAlreadyUsed,
     
-    /// Error when task has expired
-    #[msg("Task expired: The task has passed its expiration time")]
-    TaskExpired,
+    /// Error when trying to cleanup a UUID that hasn't expired yet
+    #[msg("Statement not expired: Cannot cleanup UUID before statement expiration")]
+    StatementNotExpired,
     
-    /// Error when trying to validate with wrong attestor
-    #[msg("Wrong attestor: The recovered attestor does not match the provided attestor")]
-    WrongAttestor,
+    /// Error when statement has expired
+    #[msg("Statement expired: The statement has passed its expiration time")]
+    StatementExpired,
+    
+    /// Error when trying to validate with wrong attester
+    #[msg("Wrong attester: The recovered attester does not match the provided attester")]
+    WrongAttester,
     
     /// Error when signature recovery fails
     #[msg("Signature recovery failed: Could not recover public key from signature")]
@@ -90,9 +101,9 @@ pub enum PredicateRegistryError {
     #[msg("Policy not found: No policy found for the specified client")]
     PolicyNotFound,
     
-    /// Error when trying to access non-existent attestor
-    #[msg("Attestor not found: No attestor account found")]
-    AttestorNotFound,
+    /// Error when trying to access non-existent attester
+    #[msg("Attester not found: No attester account found")]
+    AttesterNotFound,
     
     
     /// Error when clock/timestamp operations fail

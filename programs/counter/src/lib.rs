@@ -13,7 +13,7 @@
 //! where business logic is directly protected by predicate validation.
 //!
 //! ## Module Structure
-//! - `instructions`: All instruction handlers (initialize, increment, get_value)
+//! - `instructions`: All instruction handlers (initialize, increment)
 //! - `state`: Account structures and state management
 //! - `events`: Event definitions for program transparency
 //! - `errors`: Custom error codes for specific failure scenarios
@@ -66,15 +66,15 @@ pub mod counter {
     /// 
     /// This function demonstrates protected business logic that requires
     /// predicate validation before execution. It:
-    /// 1. Constructs a Task for the increment operation
+    /// 1. Constructs a Statement for the increment operation
     /// 2. Makes a CPI call to validate_attestation on predicate-registry
     /// 3. Only increments the counter if validation succeeds
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `task` - The task describing this increment operation
-    /// * `attestor_key` - The public key of the attestor
-    /// * `attestation` - The attestation from the attestor
+    /// * `statement` - The statement describing this increment operation
+    /// * `attester_key` - The public key of the attester
+    /// * `attestation` - The attestation from the attester
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -83,24 +83,10 @@ pub mod counter {
     /// * `CounterIncremented` - Emitted when counter is successfully incremented
     pub fn increment(
         ctx: Context<Increment>,
-        task: predicate_registry::Task,
-        attestor_key: Pubkey,
+        statement: predicate_registry::Statement,
+        attester_key: Pubkey,
         attestation: predicate_registry::Attestation,
     ) -> Result<()> {
-        instructions::increment(ctx, task, attestor_key, attestation)
-    }
-
-    /// Get the current counter value
-    /// 
-    /// Public read-only function to retrieve the current counter value.
-    /// This function is not protected and can be called by anyone.
-    /// 
-    /// # Arguments
-    /// * `ctx` - The instruction context containing accounts
-    /// 
-    /// # Returns
-    /// * `Result<u64>` - The current counter value
-    pub fn get_value(ctx: Context<GetValue>) -> Result<u64> {
-        instructions::get_value(ctx)
+        instructions::increment(ctx, statement, attester_key, attestation)
     }
 }
