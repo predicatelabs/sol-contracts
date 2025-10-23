@@ -238,8 +238,6 @@ pub struct CleanupExpiredUuid<'info> {
         // This prevents attackers from stealing rent by passing their own address
         constraint = validator_recipient.key() == used_uuid_account.validator
             @ PredicateRegistryError::Unauthorized
-        constraint = Clock::get()?.unix_timestamp > used_uuid_account.expires_at
-            @ PredicateRegistryError::StatementNotExpired
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,
     
