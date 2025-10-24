@@ -208,7 +208,7 @@ impl Statement {
         let mut data = Vec::new();
         data.extend_from_slice(&self.uuid);
         data.extend_from_slice(&self.msg_sender.to_bytes());
-        data.extend_from_slice(&validator.to_bytes()); // equivalent to msg.sender in Solidity
+        data.extend_from_slice(&validator.to_bytes()); 
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
         data.extend_from_slice(self.policy_id.as_bytes());

@@ -214,7 +214,13 @@ describe("Program Security Tests", () => {
 
         // Instruction 2: validate_attestation (expects ed25519 at index 1, but it's at 0!)
         const validateIx = await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -273,7 +279,13 @@ describe("Program Security Tests", () => {
         transaction1.add(ed25519Ix);
 
         const validateIx = await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -348,7 +360,13 @@ describe("Program Security Tests", () => {
 
         // Instruction 1: Try to validate statement2 (but ed25519 is for statement1!)
         const validateIx2 = await context.program.methods
-          .validateAttestation(statement2, attester.publicKey, attestation2)
+          .validateAttestation(
+            statement2.target,
+            statement2.msgValue,
+            statement2.encodedSigAndArgs,
+            attester.publicKey,
+            attestation2
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,

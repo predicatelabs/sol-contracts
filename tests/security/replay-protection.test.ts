@@ -161,7 +161,13 @@ describe("Program Security Tests", () => {
         });
 
         const tx = await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -217,7 +223,13 @@ describe("Program Security Tests", () => {
         });
 
         await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -256,7 +268,13 @@ describe("Program Security Tests", () => {
 
         // First validation should succeed
         await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -279,7 +297,13 @@ describe("Program Security Tests", () => {
           });
 
           await program.methods
-            .validateAttestation(statement, attester.publicKey, attestation)
+            .validateAttestation(
+              statement.target,
+              statement.msgValue,
+              statement.encodedSigAndArgs,
+              attester.publicKey,
+              attestation
+            )
             .accounts({
               registry: context.registry.registryPda,
               attesterAccount: attesterPda,
@@ -330,7 +354,13 @@ describe("Program Security Tests", () => {
         });
 
         await program.methods
-          .validateAttestation(statement1, attester.publicKey, attestation1)
+          .validateAttestation(
+            statement1.target,
+            statement1.msgValue,
+            statement1.encodedSigAndArgs,
+            attester.publicKey,
+            attestation1
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -353,7 +383,13 @@ describe("Program Security Tests", () => {
         });
 
         const tx = await program.methods
-          .validateAttestation(statement2, attester.publicKey, attestation2)
+          .validateAttestation(
+            statement2.target,
+            statement2.msgValue,
+            statement2.encodedSigAndArgs,
+            attester.publicKey,
+            attestation2
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -394,7 +430,13 @@ describe("Program Security Tests", () => {
         });
 
         await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -454,7 +496,13 @@ describe("Program Security Tests", () => {
 
         try {
           await program.methods
-            .validateAttestation(statement, attester.publicKey, attestation)
+            .validateAttestation(
+              statement.target,
+              statement.msgValue,
+              statement.encodedSigAndArgs,
+              attester.publicKey,
+              attestation
+            )
             .accounts({
               registry: context.registry.registryPda,
               attesterAccount: attesterPda,
@@ -505,7 +553,13 @@ describe("Program Security Tests", () => {
         });
 
         const tx = await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -541,7 +595,13 @@ describe("Program Security Tests", () => {
         });
 
         const tx = await program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,

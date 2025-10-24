@@ -4,6 +4,7 @@ import {
   PublicKey,
   Transaction,
   Ed25519Program,
+  SystemProgram,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import * as crypto from "crypto";
@@ -21,13 +22,13 @@ import {
   getFutureTimestamp,
   getPastTimestamp,
   expectError,
+  findUsedUuidPDA,
 } from "../helpers/test-utils";
 
 describe("Validate Attestation", () => {
   let context: SharedTestContext;
   let attester: Keypair;
-  let client: Keypair;
-  let validator: Keypair;
+  let client: Keypair; // The actual client/signer
   let attesterPda: PublicKey;
   let policyPda: PublicKey;
 
@@ -43,9 +44,6 @@ describe("Validate Attestation", () => {
 
     const clientAccount = await createTestAccount(context.provider);
     client = clientAccount.keypair;
-
-    const validatorAccount = await createTestAccount(context.provider);
-    validator = validatorAccount.keypair;
 
     // Get PDAs
     const [attesterPdaResult] = findAttesterPDA(
@@ -101,7 +99,7 @@ describe("Validate Attestation", () => {
    */
   function createMessageHash(
     statement: any,
-    validatorPubkey: PublicKey
+    clientPubkey: PublicKey
   ): Buffer {
     // Create message hash exactly like the Rust implementation
     // This matches the hash_statement_safe function in state.rs
@@ -109,7 +107,7 @@ describe("Validate Attestation", () => {
     const data = Buffer.concat([
       Buffer.from(statement.uuid),
       statement.msgSender.toBuffer(),
-      validatorPubkey.toBuffer(), // validator key (equivalent to msg.sender in Solidity)
+      clientPubkey.toBuffer(), // client key (equivalent to msg.sender in Solidity)
       Buffer.from(statement.msgValue.toBuffer("le", 8)),
       statement.encodedSigAndArgs,
       Buffer.from(statement.policyId, "utf8"),
@@ -126,9 +124,9 @@ describe("Validate Attestation", () => {
   function createSignature(
     statement: any,
     attesterKeypair: Keypair,
-    validatorPubkey: PublicKey
+    clientPubkey: PublicKey
   ): Uint8Array {
-    const messageHash = createMessageHash(statement, validatorPubkey);
+    const messageHash = createMessageHash(statement, clientPubkey);
 
     // Sign with Ed25519 using NaCl/TweetNaCl
     const signature = nacl.sign.detached(
@@ -165,7 +163,7 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         attester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         uuid,
@@ -175,7 +173,7 @@ describe("Validate Attestation", () => {
       );
 
       // Create message hash for Ed25519 verification instruction
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement, client.publicKey);
 
       // Create Ed25519 verification instruction
       const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -184,14 +182,27 @@ describe("Validate Attestation", () => {
         signature: signature,
       });
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
+      );
+
       // Create the validate attestation instruction
       const validateInstruction = await context.program.methods
-        .validateAttestation(statement, attester.publicKey, attestation)
+        .validateAttestation(
+          statement.target,
+          statement.msgValue,
+          statement.encodedSigAndArgs,
+          attester.publicKey,
+          attestation
+        )
         .accounts({
           registry: context.registry.registryPda,
           attesterAccount: attesterPda,
-          policyAccount: policyPda,
-          validator: validator.publicKey,
+          policyAccount: policyPda,       
+          usedUuidAccount: usedUuidPda,
+          validator: client.publicKey,
+          systemProgram: SystemProgram.programId,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         } as any)
         .instruction();
@@ -203,7 +214,7 @@ describe("Validate Attestation", () => {
 
       // Send transaction
       const result = await context.provider.sendAndConfirm(transaction, [
-        validator,
+        client,
       ]);
 
       expect(result).to.be.a("string");
@@ -219,7 +230,7 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         attester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         uuid,
@@ -228,21 +239,35 @@ describe("Validate Attestation", () => {
         signature
       );
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
+      );
+
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
       } catch (error) {
-        expectError(error, "AttestationExpired");
+        expectError(error, "StatementExpired");
       }
     });
 
@@ -255,7 +280,7 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         attester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         attestationUuid,
@@ -264,21 +289,35 @@ describe("Validate Attestation", () => {
         signature
       );
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(attestationUuid),
+        context.program.programId
+      );
+
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
       } catch (error) {
-        expectError(error, "StatementIdMismatch");
+        expectError(error, "InvalidSignature");
       }
     });
 
@@ -296,16 +335,30 @@ describe("Validate Attestation", () => {
         invalidSignature
       );
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
+      );
+
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
@@ -330,7 +383,7 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         wrongAttester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         uuid,
@@ -339,16 +392,30 @@ describe("Validate Attestation", () => {
         signature
       );
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
+      );
+
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
@@ -376,7 +443,7 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         unregisteredAttester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         uuid,
@@ -390,10 +457,17 @@ describe("Validate Attestation", () => {
         context.program.programId
       );
 
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
+      );
+
       try {
         await context.program.methods
           .validateAttestation(
-            statement,
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
             unregisteredAttester.publicKey,
             attestation
           )
@@ -401,9 +475,12 @@ describe("Validate Attestation", () => {
             registry: context.registry.registryPda,
             attesterAccount: unregisteredAttesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
@@ -422,30 +499,44 @@ describe("Validate Attestation", () => {
       const signature = createSignature(
         statement,
         attester,
-        validator.publicKey
+        client.publicKey
       );
       const attestation = createAttestation(
         uuid,
         attester,
         attestationExpiration,
         signature
+      );    
+
+      const [usedUuidPda] = findUsedUuidPDA(
+        Array.from(uuid),
+        context.program.programId
       );
 
       try {
         await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
             policyAccount: policyPda,
-            validator: validator.publicKey,
+            usedUuidAccount: usedUuidPda,
+            validator: client.publicKey,
+            systemProgram: SystemProgram.programId,
+            instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
-          .signers([validator])
+          .signers([client])
           .rpc();
 
         expect.fail("Expected transaction to fail");
       } catch (error) {
-        expectError(error, "ExpirationMismatch");
+        expectError(error, "InvalidSignature");
       }
     });
   });

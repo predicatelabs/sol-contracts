@@ -148,20 +148,23 @@ pub mod predicate_registry {
         instructions::update_policy_id(ctx, policy_id)
     }
 
-    /// Validate an attestation for a statement
+    /// Validate an attestation for a transaction
     /// 
-    /// Validates that an attestation is valid for a given statement, checking:
-    /// - Attester is registered
-    /// - Statement hasn't expired
-    /// - Attestation signature is valid
-    /// - Policy matches
-    /// - UUID hasn't been used before (replay protection)
+    /// Constructs a Statement internally from validated sources and verifies the attestation.
+    /// This function mirrors the Solidity PredicateClient._authorizeTransaction pattern.
+    /// 
+    /// The Statement is built from:
+    /// - `msg_sender`: Derived from the validator (Signer) - cannot be faked
+    /// - `policy_id`: Derived from the validated policy_account PDA - cannot be faked
+    /// - Other fields: Provided by caller but validated via signature verification
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `statement` - The statement to validate
-    /// * `attestation` - The attestation for the statement
+    /// * `target` - The program being called (e.g., counter program ID)
+    /// * `msg_value` - The value being transferred (typically 0 on Solana)
+    /// * `encoded_sig_and_args` - The encoded function signature and arguments
     /// * `attester_key` - The public key of the attester
+    /// * `attestation` - The attestation containing uuid, expiration, and signature
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -175,17 +178,25 @@ pub mod predicate_registry {
     /// * `StatementExpired` - If statement has expired
     /// * `AttestationExpired` - If attestation has expired
     /// * `InvalidSignature` - If attestation signature is invalid
-    /// * `StatementIdMismatch` - If statement and attestation UUIDs don't match
-    /// * `ExpirationMismatch` - If statement and attestation expirations don't match
     /// * `WrongAttester` - If signature doesn't match provided attester
     /// * `UuidAlreadyUsed` - If UUID has already been validated (replay attack)
+    /// * `PolicyIdMismatch` - If derived policy doesn't match expected
     pub fn validate_attestation(
-        ctx: Context<ValidateAttestation>, 
-        statement: Statement, 
+        ctx: Context<ValidateAttestation>,
+        target: Pubkey,
+        msg_value: u64,
+        encoded_sig_and_args: Vec<u8>,
         attester_key: Pubkey,
         attestation: Attestation
     ) -> Result<()> {
-        instructions::validate_attestation(ctx, statement, attester_key, attestation).map(|_| ())
+        instructions::validate_attestation(
+            ctx,
+            target,
+            msg_value,
+            encoded_sig_and_args,
+            attester_key,
+            attestation
+        ).map(|_| ())
     }
 
     /// Cleanup an expired UUID account to reclaim rent

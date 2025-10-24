@@ -7,7 +7,6 @@ use predicate_registry::{
     PredicateRegistry as PredicateRegistryAccount,
     AttesterAccount,
     PolicyAccount,
-    Statement,
     Attestation,
 };
 use crate::state::CounterAccount;
@@ -17,14 +16,13 @@ use crate::errors::CounterError;
 /// Increment the counter after validating attestation
 /// 
 /// This function demonstrates protected business logic that requires
-/// predicate validation before execution. It:
-/// 1. Constructs a Statement for the increment operation
-/// 2. Makes a CPI call to validate_attestation on predicate-registry
-/// 3. Only increments the counter if validation succeeds
+/// predicate validation before execution. The Statement is constructed
+/// internally by the predicate_registry, similar to how Solidity's
+/// PredicateClient._authorizeTransaction works.
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `statement` - The statement describing this increment operation
+/// * `encoded_sig_and_args` - The encoded function signature (e.g., "increment()")
 /// * `attester_key` - The public key of the attester
 /// * `attestation` - The attestation from the attester
 /// 
@@ -35,33 +33,36 @@ use crate::errors::CounterError;
 /// * `CounterIncremented` - Emitted when counter is successfully incremented
 pub fn increment(
     ctx: Context<Increment>,
-    statement: Statement,
+    encoded_sig_and_args: Vec<u8>,
     attester_key: Pubkey,
     attestation: Attestation,
 ) -> Result<()> {
-    // Validate that the statement is for this specific increment operation
+    // Validate that the encoded signature is for the increment operation
     let expected_encoded_sig = encode_increment_signature();
     require!(
-        statement.encoded_sig_and_args == expected_encoded_sig,
+        encoded_sig_and_args == expected_encoded_sig,
         CounterError::InvalidStatement
     );
 
-    // Validate that the statement sender matches the counter owner
-    require!(
-        statement.msg_sender == ctx.accounts.counter.owner,
-        CounterError::Unauthorized
-    );
-
-    // Validate that the statement target matches this program
-    require!(
-        statement.target == crate::ID,
-        CounterError::InvalidStatement
-    );
-
-    // Make CPI call to validate attestation
-    validate_attestation_cpi(
-        &ctx,
-        statement,
+    // Authorize the transaction via predicate registry
+    // The registry will construct the Statement internally, ensuring
+    // msg_sender and policy_id cannot be faked
+    predicate_registry::cpi::validate_attestation(
+        CpiContext::new(
+            ctx.accounts.predicate_registry_program.to_account_info(),
+            ValidateAttestation {
+                registry: ctx.accounts.predicate_registry.to_account_info(),
+                attester_account: ctx.accounts.attester_account.to_account_info(),
+                policy_account: ctx.accounts.policy_account.to_account_info(),
+                used_uuid_account: ctx.accounts.used_uuid_account.to_account_info(),
+                validator: ctx.accounts.owner.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
+            }
+        ),
+        crate::ID,              // target: this counter program
+        0,                      // msg_value: 0 (Solana doesn't have msg.value)
+        encoded_sig_and_args,   // function signature
         attester_key,
         attestation,
     )?;
@@ -91,36 +92,6 @@ pub fn increment(
     Ok(())
 }
 
-/// Make a CPI call to validate attestation
-fn validate_attestation_cpi(
-    ctx: &Context<Increment>,
-    statement: Statement,
-    attester_key: Pubkey,
-    attestation: Attestation,
-) -> Result<()> {
-    let cpi_accounts = ValidateAttestation {
-        registry: ctx.accounts.predicate_registry.to_account_info(),
-        attester_account: ctx.accounts.attester_account.to_account_info(),
-        policy_account: ctx.accounts.policy_account.to_account_info(),
-        used_uuid_account: ctx.accounts.used_uuid_account.to_account_info(),
-        validator: ctx.accounts.owner.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-        instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
-    };
-
-    let cpi_program = ctx.accounts.predicate_registry_program.to_account_info();
-    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-    predicate_registry::cpi::validate_attestation(
-        cpi_ctx,
-        statement,
-        attester_key,
-        attestation,
-    )?;
-
-    Ok(())
-}
-
 /// Encode the increment function signature for statement validation
 fn encode_increment_signature() -> Vec<u8> {
     // This represents the signature of the increment function call
@@ -129,7 +100,11 @@ fn encode_increment_signature() -> Vec<u8> {
 }
 
 #[derive(Accounts)]
-#[instruction(statement: Statement)]
+#[instruction(
+    encoded_sig_and_args: Vec<u8>,
+    attester_key: Pubkey,
+    attestation: Attestation
+)]
 pub struct Increment<'info> {
     #[account(
         mut,
