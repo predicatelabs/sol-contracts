@@ -160,7 +160,13 @@ pub struct UpdatePolicyId<'info> {
 
 /// Account validation context for validating an attestation
 #[derive(Accounts)]
-#[instruction(statement: Statement, attester_key: Pubkey)]
+#[instruction(
+    target: Pubkey,
+    msg_value: u64,
+    encoded_sig_and_args: Vec<u8>,
+    attester_key: Pubkey,
+    attestation: Attestation
+)]
 pub struct ValidateAttestation<'info> {    
     /// The registry account
     #[account(
@@ -178,9 +184,10 @@ pub struct ValidateAttestation<'info> {
     )]
     pub attester_account: Account<'info, AttesterAccount>,
     
-    /// The policy account for the client
+    /// The policy account for the validator (msg.sender)
+    /// Note: We derive this from validator.key(), not from client-provided data
     #[account(
-        seeds = [b"policy", statement.msg_sender.as_ref()],
+        seeds = [b"policy", validator.key().as_ref()],
         bump
     )]
     pub policy_account: Account<'info, PolicyAccount>,
@@ -191,7 +198,7 @@ pub struct ValidateAttestation<'info> {
         init,
         payer = validator,
         space = 8 + UsedUuidAccount::INIT_SPACE,
-        seeds = [b"used_uuid", statement.uuid.as_ref()],
+        seeds = [b"used_uuid", attestation.uuid.as_ref()],
         bump
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,

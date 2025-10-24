@@ -287,7 +287,13 @@ describe("Program Security Tests", () => {
         // Instruction 2: validate_attestation
         transaction.add(
           await context.program.methods
-            .validateAttestation(statement, attester.publicKey, attestation)
+            .validateAttestation(
+              statement.target,
+              statement.msgValue,
+              statement.encodedSigAndArgs,
+              attester.publicKey,
+              attestation
+            )
             .accounts({
               registry: context.registry.registryPda,
               attesterAccount: attesterPda,
@@ -359,7 +365,13 @@ describe("Program Security Tests", () => {
         });
 
         const validateIx = await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -421,7 +433,13 @@ describe("Program Security Tests", () => {
         });
 
         const validateIx = await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
@@ -485,7 +503,9 @@ describe("Program Security Tests", () => {
         // But pass tampered statement
         const validateIx = await context.program.methods
           .validateAttestation(
-            tamperedStatement,
+            tamperedStatement.target,
+            tamperedStatement.msgValue,
+            tamperedStatement.encodedSigAndArgs,
             attester.publicKey,
             attestation
           )
@@ -575,7 +595,13 @@ describe("Program Security Tests", () => {
         });
 
         const validateIx = await context.program.methods
-          .validateAttestation(statement, attester.publicKey, attestation)
+          .validateAttestation(
+            statement.target,
+            statement.msgValue,
+            statement.encodedSigAndArgs,
+            attester.publicKey,
+            attestation
+          )
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,

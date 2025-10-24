@@ -386,7 +386,11 @@ async function incrementCounter(
 
   // Create the increment instruction
   const incrementInstruction = await counterProgram.methods
-    .increment(statement, attester.publicKey, attestation)
+    .increment(
+      statement.encodedSigAndArgs,  // encoded_sig_and_args
+      attester.publicKey,            // attester_key
+      attestation                    // attestation
+    )
     .accounts({
       counter: pdas.counterPda,
       owner: owner.publicKey,

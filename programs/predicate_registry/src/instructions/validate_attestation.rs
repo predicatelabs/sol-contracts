@@ -10,32 +10,33 @@ use anchor_lang::solana_program::{
     sysvar::instructions::{self, load_current_index_checked, load_instruction_at_checked},
 };
 
-/// Validate an attestation for a statement
+/// Validate an attestation for a transaction
 /// 
-/// This function performs comprehensive validation of an attestation including:
-/// - Input validation and sanitization
-/// - Expiration checks for both statement and attestation
-/// - Policy verification
-/// - Attester registration verification
-/// - Ed25519 signature verification using Solana's native program
+/// This function constructs a Statement internally from validated sources,
+/// ensuring that critical fields (msg_sender, policy_id) cannot be faked by the client.
+/// This mirrors the Solidity PredicateClient._authorizeTransaction pattern.
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `statement` - The statement to be validated
-/// * `attestation` - The attestation from the attester
+/// * `target` - The program being called
+/// * `msg_value` - The value being transferred (typically 0 on Solana)
+/// * `encoded_sig_and_args` - The encoded function signature and arguments
 /// * `attester_key` - The public key of the attester
+/// * `attestation` - The attestation containing uuid, expiration, and signature
 /// 
 /// # Returns
-/// * `Result<bool>` - True if validation successful
+/// * `Result<bool>` - True if validation succeeds
 /// 
-/// # Security Considerations
-/// - All inputs are validated before processing
-/// - Signature verification uses Solana's native ed25519_program
-/// - Replay attack prevention through expiration checks
-/// - Comprehensive error handling with specific error types
+/// # Security
+/// The Statement is constructed from:
+/// - `msg_sender`: validator.key() - the actual transaction signer (can't be faked)
+/// - `policy_id`: policy_account.policy_id - from validated PDA (can't be faked)
+/// - Other fields: Provided by client but validated via signature verification
 pub fn validate_attestation(
-    ctx: Context<ValidateAttestation>, 
-    statement: Statement, 
+    ctx: Context<ValidateAttestation>,
+    target: Pubkey,
+    msg_value: u64,
+    encoded_sig_and_args: Vec<u8>,
     attester_key: Pubkey,
     attestation: Attestation
 ) -> Result<bool> {
@@ -44,6 +45,17 @@ pub fn validate_attestation(
     let policy_account = &ctx.accounts.policy_account;
     let used_uuid_account = &mut ctx.accounts.used_uuid_account;
     let validator = &ctx.accounts.validator;
+    
+
+    let statement = Statement {
+        uuid: attestation.uuid,
+        msg_sender: validator.key(),                   
+        target,
+        msg_value,
+        encoded_sig_and_args,
+        policy_id: policy_account.policy_id.clone(),
+        expiration: attestation.expiration,
+    };
     
     // Get current timestamp with error handling
     let clock = Clock::get().map_err(|_| PredicateRegistryError::ClockError)?;
@@ -65,26 +77,8 @@ pub fn validate_attestation(
 
     // === BUSINESS LOGIC VALIDATION ===
 
-    // Check if statement ID matches attestation ID
-    require!(
-        statement.uuid == attestation.uuid,
-        PredicateRegistryError::StatementIdMismatch
-    );
-
-    // Check if statement expiration matches attestation expiration
-    require!(
-        statement.expiration == attestation.expiration,
-        PredicateRegistryError::ExpirationMismatch
-    );
-
-    // Check if attestation has expired (with small buffer for clock drift)
+    // Check if statement has expired (with small buffer for clock drift)
     const CLOCK_DRIFT_BUFFER: i64 = 30; // 30 seconds buffer
-    require!(
-        current_timestamp <= attestation.expiration + CLOCK_DRIFT_BUFFER,
-        PredicateRegistryError::AttestationExpired
-    );
-
-    // Check if statement has expired
     require!(
         current_timestamp <= statement.expiration + CLOCK_DRIFT_BUFFER,
         PredicateRegistryError::StatementExpired

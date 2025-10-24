@@ -144,6 +144,19 @@ export function findPolicyPDA(
 }
 
 /**
+ * Finds used UUID PDA for a given UUID
+ */
+export function findUsedUuidPDA(
+  uuid: number[], 
+  programId: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("used_uuid"), Buffer.from(uuid)],
+    programId
+  );
+}
+
+/**
  * Initializes the predicate registry with the given authority
  */
 export async function initializeRegistry(

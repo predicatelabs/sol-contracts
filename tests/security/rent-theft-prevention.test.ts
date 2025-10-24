@@ -175,7 +175,13 @@ describe("Program Security Tests", () => {
 
       // Step 2: Validator creates UUID account
       await program.methods
-        .validateAttestation(statement, attester.publicKey, attestation)
+        .validateAttestation(
+          statement.target,
+          statement.msgValue,
+          statement.encodedSigAndArgs,
+          attester.publicKey,
+          attestation
+        )
         .accounts({
           registry: context.registry.registryPda,
           attesterAccount: attesterPda,
@@ -275,7 +281,13 @@ describe("Program Security Tests", () => {
 
       // Create UUID account
       await program.methods
-        .validateAttestation(statement, attester.publicKey, attestation)
+        .validateAttestation(
+          statement.target,
+          statement.msgValue,
+          statement.encodedSigAndArgs,
+          attester.publicKey,
+          attestation
+        )
         .accounts({
           registry: context.registry.registryPda,
           attesterAccount: attesterPda,
@@ -364,7 +376,13 @@ describe("Program Security Tests", () => {
 
       // Create UUID account
       await program.methods
-        .validateAttestation(statement, attester.publicKey, attestation)
+        .validateAttestation(
+          statement.target,
+          statement.msgValue,
+          statement.encodedSigAndArgs,
+          attester.publicKey,
+          attestation
+        )
         .accounts({
           registry: context.registry.registryPda,
           attesterAccount: attesterPda,
