@@ -94,14 +94,11 @@ describe("Program Security Tests", () => {
     /**
      * Helper: Create message hash matching hash_statement_safe in Rust
      */
-    function createMessageHash(
-      statement: any,
-      validatorKey: PublicKey
-    ): Buffer {
+    function createMessageHash(statement: any): Buffer {
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
-        validatorKey.toBuffer(),
+        statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
         statement.encodedSigAndArgs,
         Buffer.from(statement.policyId, "utf8"),
@@ -166,7 +163,7 @@ describe("Program Security Tests", () => {
       const usedUuidPda = findUsedUuidPDA(uuid);
 
       // Create Ed25519 instruction
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement);
       const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
         publicKey: attester.publicKey.toBytes(),
         message: messageHash,
@@ -187,7 +184,7 @@ describe("Program Security Tests", () => {
           attesterAccount: attesterPda,
           policyAccount: policyAccount,
           usedUuidAccount: usedUuidPda,
-          validator: validator.publicKey,
+          signer: validator.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         } as any)
@@ -213,7 +210,7 @@ describe("Program Security Tests", () => {
           .cleanupExpiredUuid()
           .accounts({
             usedUuidAccount: usedUuidPda,
-            validatorRecipient: attacker.publicKey, // ← Attacker's address!
+            signerRecipient: attacker.publicKey, // ← Attacker's address!
           } as any)
           .rpc();
 
@@ -272,7 +269,7 @@ describe("Program Security Tests", () => {
       const usedUuidPda = findUsedUuidPDA(uuid);
 
       // Create Ed25519 instruction
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement);
       const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
         publicKey: attester.publicKey.toBytes(),
         message: messageHash,
@@ -293,7 +290,7 @@ describe("Program Security Tests", () => {
           attesterAccount: attesterPda,
           policyAccount: policyAccount,
           usedUuidAccount: usedUuidPda,
-          validator: validator.publicKey,
+          signer: validator.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         } as any)
@@ -319,7 +316,7 @@ describe("Program Security Tests", () => {
           .cleanupExpiredUuid()
           .accounts({
             usedUuidAccount: usedUuidPda,
-            validatorRecipient: validator.publicKey, // ← Correct address
+            signerRecipient: validator.publicKey, // ← Correct address
           } as any)
           .rpc();
 
@@ -367,7 +364,7 @@ describe("Program Security Tests", () => {
       const usedUuidPda = findUsedUuidPDA(uuid);
 
       // Create Ed25519 instruction
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement);
       const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
         publicKey: attester.publicKey.toBytes(),
         message: messageHash,
@@ -388,7 +385,7 @@ describe("Program Security Tests", () => {
           attesterAccount: attesterPda,
           policyAccount: policyAccount,
           usedUuidAccount: usedUuidPda,
-          validator: validator.publicKey,
+          signer: validator.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         } as any)
@@ -410,7 +407,7 @@ describe("Program Security Tests", () => {
           .cleanupExpiredUuid()
           .accounts({
             usedUuidAccount: usedUuidPda,
-            validatorRecipient: validator.publicKey, // ← Validator's own address
+            signerRecipient: validator.publicKey, // ← Validator's own address
           } as any)
           .rpc();
 

@@ -44,12 +44,12 @@ pub fn validate_attestation(
     let attester_account = &mut ctx.accounts.attester_account;
     let policy_account = &ctx.accounts.policy_account;
     let used_uuid_account = &mut ctx.accounts.used_uuid_account;
-    let validator = &ctx.accounts.validator;
+    let signer = &ctx.accounts.signer;
     
 
     let statement = Statement {
         uuid: attestation.uuid,
-        msg_sender: validator.key(),                   
+        msg_sender: signer.key(),                   
         target,
         msg_value,
         encoded_sig_and_args,
@@ -112,7 +112,7 @@ pub fn validate_attestation(
     // === SIGNATURE VERIFICATION ===
     
     // Hash the statement for signature verification
-    let message_hash = statement.hash_statement_safe(validator.key());
+    let message_hash = statement.hash_statement_safe();
     
     // Verify Ed25519 signature using Solana's native verification
     // This implementation checks that the ed25519 verification instruction was included
@@ -133,12 +133,12 @@ pub fn validate_attestation(
     used_uuid_account.uuid = statement.uuid;
     used_uuid_account.used_at = current_timestamp;
     used_uuid_account.expires_at = statement.expiration;
-    used_uuid_account.validator = validator.key();
+    used_uuid_account.signer = signer.key();
 
     // Emit UUID marked as used event
     emit!(UuidMarkedUsed {
         uuid: statement.format_uuid(),
-        validator: validator.key(),
+        signer: signer.key(),
         expires_at: statement.expiration,
         timestamp: current_timestamp,
     });

@@ -112,14 +112,11 @@ describe("Program Security Tests", () => {
     /**
      * Helper: Create message hash
      */
-    function createMessageHash(
-      statement: any,
-      validatorKey: PublicKey
-    ): Buffer {
+    function createMessageHash(statement: any): Buffer {
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
-        validatorKey.toBuffer(),
+        statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
         Buffer.from(statement.encodedSigAndArgs),
         Buffer.from(statement.policyId, "utf8"),
@@ -196,7 +193,7 @@ describe("Program Security Tests", () => {
         const transaction = new Transaction();
 
         // Instruction 0: Ed25519 verification
-        const messageHash = createMessageHash(statement, validator.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -226,7 +223,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda1,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -270,7 +267,7 @@ describe("Program Security Tests", () => {
         // First validation - should succeed
         const transaction1 = new Transaction();
 
-        const messageHash = createMessageHash(statement, validator.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -291,7 +288,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda1,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -372,7 +369,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda2,
             usedUuidAccount: usedUuidPda2,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)

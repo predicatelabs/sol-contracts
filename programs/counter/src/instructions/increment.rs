@@ -55,7 +55,7 @@ pub fn increment(
                 attester_account: ctx.accounts.attester_account.to_account_info(),
                 policy_account: ctx.accounts.policy_account.to_account_info(),
                 used_uuid_account: ctx.accounts.used_uuid_account.to_account_info(),
-                validator: ctx.accounts.owner.to_account_info(),
+                signer: ctx.accounts.owner.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
                 instructions_sysvar: ctx.accounts.instructions_sysvar.to_account_info(),
             }

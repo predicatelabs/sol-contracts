@@ -58,8 +58,8 @@ pub struct UsedUuidAccount {
     pub used_at: i64,
     /// When the statement expires (for cleanup eligibility)
     pub expires_at: i64,
-    /// Who validated it (the payer/validator)
-    pub validator: Pubkey,
+    /// Who performed the validation (the transaction signer)
+    pub signer: Pubkey,
 }
 
 
@@ -202,13 +202,13 @@ impl Statement {
     }
 
     /// Hash the statement for signature verification (equivalent to hashStatementSafe in Solidity)
-    pub fn hash_statement_safe(&self, validator: Pubkey) -> [u8; 32] {
+    pub fn hash_statement_safe(&self) -> [u8; 32] {
         use anchor_lang::solana_program::hash::hash;
         
         let mut data = Vec::new();
         data.extend_from_slice(&self.uuid);
         data.extend_from_slice(&self.msg_sender.to_bytes());
-        data.extend_from_slice(&validator.to_bytes()); 
+        data.extend_from_slice(&self.target.to_bytes()); 
         data.extend_from_slice(&self.msg_value.to_le_bytes());
         data.extend_from_slice(&self.encoded_sig_and_args);
         data.extend_from_slice(self.policy_id.as_bytes());

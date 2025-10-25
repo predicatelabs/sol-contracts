@@ -114,8 +114,8 @@ pub struct PolicyUpdated {
 pub struct UuidMarkedUsed {
     /// The UUID that was marked as used (formatted)
     pub uuid: String,
-    /// Who validated it (payer/validator)
-    pub validator: Pubkey,
+    /// Who performed the validation (the transaction signer)
+    pub signer: Pubkey,
     /// When the statement expires
     pub expires_at: i64,
     /// Timestamp when marked as used
