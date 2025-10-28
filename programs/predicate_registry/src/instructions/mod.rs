@@ -184,10 +184,10 @@ pub struct ValidateAttestation<'info> {
     )]
     pub attester_account: Account<'info, AttesterAccount>,
     
-    /// The policy account for the validator (msg.sender)
-    /// Note: We derive this from validator.key(), not from client-provided data
+    /// The policy account for the transaction signer
+    /// Note: We derive this from signer.key(), not from client-provided data
     #[account(
-        seeds = [b"policy", validator.key().as_ref()],
+        seeds = [b"policy", signer.key().as_ref()],
         bump
     )]
     pub policy_account: Account<'info, PolicyAccount>,
@@ -196,16 +196,16 @@ pub struct ValidateAttestation<'info> {
     /// Must be created for first use, will fail if already exists
     #[account(
         init,
-        payer = validator,
+        payer = signer,
         space = 8 + UsedUuidAccount::INIT_SPACE,
         seeds = [b"used_uuid", attestation.uuid.as_ref()],
         bump
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,
     
-    /// The validator calling this instruction (also payer for UUID account)
+    /// The transaction signer (also payer for UUID account)
     #[account(mut)]
-    pub validator: Signer<'info>,
+    pub signer: Signer<'info>,
     
     /// System program for account creation
     pub system_program: Program<'info, System>,
@@ -238,20 +238,20 @@ pub struct CleanupExpiredUuid<'info> {
     /// The used UUID account to be cleaned up (closed)
     #[account(
         mut,
-        close = validator_recipient,
+        close = signer_recipient,
         seeds = [b"used_uuid", &used_uuid_account.uuid],
         bump,
         // CRITICAL: Enforce rent refund goes to the original payer
         // This prevents attackers from stealing rent by passing their own address
-        constraint = validator_recipient.key() == used_uuid_account.validator
+        constraint = signer_recipient.key() == used_uuid_account.signer
             @ PredicateRegistryError::Unauthorized
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,
     
-    /// The original validator (payer) who will receive the rent refund
-    /// CHECK: Safe via constraint above; verified to match used_uuid_account.validator
+    /// The original signer (payer) who will receive the rent refund
+    /// CHECK: Safe via constraint above; verified to match used_uuid_account.signer
     #[account(mut)]
-    pub validator_recipient: AccountInfo<'info>,
+    pub signer_recipient: AccountInfo<'info>,
 }
 
 /// Account validation context for getting registered attestors (view function)

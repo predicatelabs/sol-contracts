@@ -93,14 +93,11 @@ describe("Program Security Tests", () => {
     /**
      * Helper: Create message hash matching hash_statement_safe in Rust
      */
-    function createMessageHash(
-      statement: any,
-      validatorKey: PublicKey
-    ): Buffer {
+    function createMessageHash(statement: any): Buffer {
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
-        validatorKey.toBuffer(),
+        statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
         Buffer.from(statement.encodedSigAndArgs),
         Buffer.from(statement.policyId, "utf8"),
@@ -134,7 +131,7 @@ describe("Program Security Tests", () => {
       statement: any,
       validatorKey: PublicKey
     ) {
-      const messageHash = createMessageHash(statement, validatorKey);
+      const messageHash = createMessageHash(statement);
       const signature = nacl.sign.detached(
         messageHash,
         attesterKeypair.secretKey
@@ -271,7 +268,7 @@ describe("Program Security Tests", () => {
 
         // Instruction 1: Ed25519 verification that references instruction 0
         // This attempts to verify a signature using data from instruction 0
-        const messageHash = createMessageHash(statement, validator.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = createCustomEd25519Instruction(
           attester.publicKey.toBytes(),
           messageHash,
@@ -299,7 +296,7 @@ describe("Program Security Tests", () => {
               attesterAccount: attesterPda,
               policyAccount: policyPda,
               usedUuidAccount: usedUuidPda,
-              validator: validator.publicKey,
+              signer: validator.publicKey,
               systemProgram: SystemProgram.programId,
               instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
             } as any)
@@ -334,10 +331,7 @@ describe("Program Security Tests", () => {
         crypto.randomBytes(16),
         expiration
       );
-      const differentMessageHash = createMessageHash(
-        differentStatement,
-        validator.publicKey
-      );
+      const differentMessageHash = createMessageHash(differentStatement);
       const differentSignature = nacl.sign.detached(
         differentMessageHash,
         attester.secretKey
@@ -357,7 +351,7 @@ describe("Program Security Tests", () => {
       );
 
       try {
-        const messageHash = createMessageHash(statement, validator.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -377,7 +371,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -407,7 +401,7 @@ describe("Program Security Tests", () => {
       const statement = createStatement(uuid, expiration);
 
       // Sign with wrong attester
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement);
       const signature = nacl.sign.detached(
         messageHash,
         wrongAttester.secretKey
@@ -445,7 +439,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -472,7 +466,7 @@ describe("Program Security Tests", () => {
       const statement = createStatement(uuid, expiration);
 
       // Create valid signature for original statement
-      const messageHash = createMessageHash(statement, validator.publicKey);
+      const messageHash = createMessageHash(statement);
       const signature = nacl.sign.detached(messageHash, attester.secretKey);
 
       // Modify the statement after signing
@@ -514,7 +508,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -607,7 +601,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: validator.publicKey,
+            signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)

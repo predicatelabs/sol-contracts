@@ -97,17 +97,14 @@ describe("Validate Attestation", () => {
   /**
    * Helper function to create message hash matching Rust implementation
    */
-  function createMessageHash(
-    statement: any,
-    clientPubkey: PublicKey
-  ): Buffer {
+  function createMessageHash(statement: any): Buffer {
     // Create message hash exactly like the Rust implementation
     // This matches the hash_statement_safe function in state.rs
 
     const data = Buffer.concat([
       Buffer.from(statement.uuid),
       statement.msgSender.toBuffer(),
-      clientPubkey.toBuffer(), // client key (equivalent to msg.sender in Solidity)
+      statement.target.toBuffer(), // target (client program ID)
       Buffer.from(statement.msgValue.toBuffer("le", 8)),
       statement.encodedSigAndArgs,
       Buffer.from(statement.policyId, "utf8"),
@@ -123,10 +120,9 @@ describe("Validate Attestation", () => {
    */
   function createSignature(
     statement: any,
-    attesterKeypair: Keypair,
-    clientPubkey: PublicKey
+    attesterKeypair: Keypair
   ): Uint8Array {
-    const messageHash = createMessageHash(statement, clientPubkey);
+    const messageHash = createMessageHash(statement);
 
     // Sign with Ed25519 using NaCl/TweetNaCl
     const signature = nacl.sign.detached(
@@ -160,11 +156,7 @@ describe("Validate Attestation", () => {
       const statement = createStatement(uuid, expiration);
 
       // Create signature
-      const signature = createSignature(
-        statement,
-        attester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -173,7 +165,7 @@ describe("Validate Attestation", () => {
       );
 
       // Create message hash for Ed25519 verification instruction
-      const messageHash = createMessageHash(statement, client.publicKey);
+      const messageHash = createMessageHash(statement);
 
       // Create Ed25519 verification instruction
       const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -199,9 +191,9 @@ describe("Validate Attestation", () => {
         .accounts({
           registry: context.registry.registryPda,
           attesterAccount: attesterPda,
-          policyAccount: policyPda,       
+          policyAccount: policyPda,
           usedUuidAccount: usedUuidPda,
-          validator: client.publicKey,
+          signer: client.publicKey,
           systemProgram: SystemProgram.programId,
           instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         } as any)
@@ -227,11 +219,7 @@ describe("Validate Attestation", () => {
       const expiration = getPastTimestamp(3600); // 1 hour ago
       const statement = createStatement(uuid, expiration);
 
-      const signature = createSignature(
-        statement,
-        attester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -258,7 +246,7 @@ describe("Validate Attestation", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -277,11 +265,7 @@ describe("Validate Attestation", () => {
       const expiration = getFutureTimestamp(3600);
 
       const statement = createStatement(statementUuid, expiration);
-      const signature = createSignature(
-        statement,
-        attester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, attester);
       const attestation = createAttestation(
         attestationUuid,
         attester,
@@ -308,7 +292,7 @@ describe("Validate Attestation", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -354,7 +338,7 @@ describe("Validate Attestation", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -380,11 +364,7 @@ describe("Validate Attestation", () => {
       const statement = createStatement(uuid, expiration);
 
       // Sign with wrong attester
-      const signature = createSignature(
-        statement,
-        wrongAttester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, wrongAttester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -411,7 +391,7 @@ describe("Validate Attestation", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -440,11 +420,7 @@ describe("Validate Attestation", () => {
       const expiration = getFutureTimestamp(3600);
       const statement = createStatement(uuid, expiration);
 
-      const signature = createSignature(
-        statement,
-        unregisteredAttester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, unregisteredAttester);
       const attestation = createAttestation(
         uuid,
         unregisteredAttester,
@@ -476,7 +452,7 @@ describe("Validate Attestation", () => {
             attesterAccount: unregisteredAttesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -496,17 +472,13 @@ describe("Validate Attestation", () => {
       const attestationExpiration = getFutureTimestamp(7200); // Different expiration
 
       const statement = createStatement(uuid, statementExpiration);
-      const signature = createSignature(
-        statement,
-        attester,
-        client.publicKey
-      );
+      const signature = createSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,
         attestationExpiration,
         signature
-      );    
+      );
 
       const [usedUuidPda] = findUsedUuidPDA(
         Array.from(uuid),
@@ -527,7 +499,7 @@ describe("Validate Attestation", () => {
             attesterAccount: attesterPda,
             policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)

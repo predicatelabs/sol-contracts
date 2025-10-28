@@ -147,7 +147,7 @@ export function findPolicyPDA(
  * Finds used UUID PDA for a given UUID
  */
 export function findUsedUuidPDA(
-  uuid: number[], 
+  uuid: number[],
   programId: PublicKey
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(

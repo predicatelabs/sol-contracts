@@ -283,11 +283,11 @@ function createIncrementStatement(
 /**
  * Create message hash for statement (matching Rust implementation)
  */
-function createMessageHash(statement: any, validatorPubkey: PublicKey): Buffer {
+function createMessageHash(statement: any): Buffer {
   const data = Buffer.concat([
     Buffer.from(statement.uuid),
     statement.msgSender.toBuffer(),
-    validatorPubkey.toBuffer(), // validator key (counter program as validator)
+    statement.target.toBuffer(),
     Buffer.from(statement.msgValue.toBuffer("le", 8)),
     Buffer.from(statement.encodedSigAndArgs),
     Buffer.from(statement.policyId, "utf8"),
@@ -301,12 +301,8 @@ function createMessageHash(statement: any, validatorPubkey: PublicKey): Buffer {
 /**
  * Create Ed25519 signature for attestation
  */
-function createSignature(
-  statement: any,
-  attesterKeypair: Keypair,
-  validatorPubkey: PublicKey
-): Uint8Array {
-  const messageHash = createMessageHash(statement, validatorPubkey);
+function createSignature(statement: any, attesterKeypair: Keypair): Uint8Array {
+  const messageHash = createMessageHash(statement);
 
   // Sign with Ed25519 using NaCl/TweetNaCl
   const signature = nacl.sign.detached(messageHash, attesterKeypair.secretKey);
@@ -356,7 +352,7 @@ async function incrementCounter(
   const statement = createIncrementStatement(owner.publicKey, counterProgram);
 
   // Create signature - use owner as validator (the one calling increment)
-  const signature = createSignature(statement, attester, owner.publicKey);
+  const signature = createSignature(statement, attester);
 
   // Create attestation
   const attestation = createAttestation(
@@ -375,7 +371,7 @@ async function incrementCounter(
   console.log(`   UUID PDA (replay protection): ${usedUuidPda.toString()}`);
 
   // Create message hash for Ed25519 verification instruction
-  const messageHash = createMessageHash(statement, owner.publicKey);
+  const messageHash = createMessageHash(statement);
 
   // Create Ed25519 verification instruction
   const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -387,9 +383,9 @@ async function incrementCounter(
   // Create the increment instruction
   const incrementInstruction = await counterProgram.methods
     .increment(
-      statement.encodedSigAndArgs,  // encoded_sig_and_args
-      attester.publicKey,            // attester_key
-      attestation                    // attestation
+      statement.encodedSigAndArgs, // encoded_sig_and_args
+      attester.publicKey, // attester_key
+      attestation // attestation
     )
     .accounts({
       counter: pdas.counterPda,

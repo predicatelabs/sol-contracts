@@ -7,7 +7,7 @@ use crate::errors::PredicateRegistryError;
 /// Cleanup an expired UUID account to reclaim rent
 /// 
 /// This function allows anyone to close a UsedUuidAccount after the statement
-/// has expired, returning the rent to the original validator (payer).
+/// has expired, returning the rent to the original signer (payer).
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
@@ -33,11 +33,11 @@ pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
     );
     
     // The account will be closed by Anchor's `close` constraint
-    // Rent will be returned to the original validator (enforced by constraint above)
+    // Rent will be returned to the original signer (enforced by constraint above)
     
     msg!(
         "Cleaned up expired UUID account, rent returned to {}",
-        used_uuid_account.validator
+        used_uuid_account.signer
     );
     
     Ok(())

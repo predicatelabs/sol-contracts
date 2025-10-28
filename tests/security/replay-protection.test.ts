@@ -89,14 +89,11 @@ describe("Program Security Tests", () => {
      * Helper function to create message hash for signing
      * This matches the hash_statement_safe function in state.rs
      */
-    function createMessageHash(
-      statement: any,
-      validatorKey: PublicKey
-    ): Buffer {
+    function createMessageHash(statement: any): Buffer {
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
-        validatorKey.toBuffer(), // validator key (equivalent to msg.sender in Solidity)
+        statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
         statement.encodedSigAndArgs,
         Buffer.from(statement.policyId, "utf8"),
@@ -115,7 +112,7 @@ describe("Program Security Tests", () => {
       attesterKeypair: Keypair,
       validatorKey: PublicKey
     ): any {
-      const messageHash = createMessageHash(statement, validatorKey);
+      const messageHash = createMessageHash(statement);
       const signature = nacl.sign.detached(
         messageHash,
         attesterKeypair.secretKey
@@ -153,7 +150,7 @@ describe("Program Security Tests", () => {
 
         const usedUuidPda = findUsedUuidPDA(uuid);
 
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -173,7 +170,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -190,7 +187,7 @@ describe("Program Security Tests", () => {
         expect(Buffer.from(usedUuidAccount.uuid)).to.deep.equal(
           Buffer.from(uuid)
         );
-        expect(usedUuidAccount.validator.toString()).to.equal(
+        expect(usedUuidAccount.signer.toString()).to.equal(
           client.publicKey.toString()
         );
       });
@@ -206,7 +203,7 @@ describe("Program Security Tests", () => {
 
         const usedUuidPda = findUsedUuidPDA(uuid);
 
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -214,9 +211,7 @@ describe("Program Security Tests", () => {
         });
 
         const listener = program.addEventListener("uuidMarkedUsed", (event) => {
-          expect(event.validator.toString()).to.equal(
-            client.publicKey.toString()
-          );
+          expect(event.signer.toString()).to.equal(client.publicKey.toString());
           expect(event.expiresAt.toString()).to.equal(
             statement.expiration.toString()
           );
@@ -235,7 +230,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -259,7 +254,7 @@ describe("Program Security Tests", () => {
 
         const usedUuidPda = findUsedUuidPDA(uuid);
 
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -280,7 +275,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -309,7 +304,7 @@ describe("Program Security Tests", () => {
               attesterAccount: attesterPda,
               policyAccount,
               usedUuidAccount: usedUuidPda,
-              validator: client.publicKey,
+              signer: client.publicKey,
               systemProgram: SystemProgram.programId,
               instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
             } as any)
@@ -346,7 +341,7 @@ describe("Program Security Tests", () => {
         const usedUuidPda2 = findUsedUuidPDA(uuid2);
 
         // First attestation
-        const messageHash1 = createMessageHash(statement1, client.publicKey);
+        const messageHash1 = createMessageHash(statement1);
         const ed25519Ix1 = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash1,
@@ -366,7 +361,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda1,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -375,7 +370,7 @@ describe("Program Security Tests", () => {
           .rpc();
 
         // Second attestation with different UUID should succeed
-        const messageHash2 = createMessageHash(statement2, client.publicKey);
+        const messageHash2 = createMessageHash(statement2);
         const ed25519Ix2 = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash2,
@@ -395,7 +390,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda2,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -422,7 +417,7 @@ describe("Program Security Tests", () => {
         const usedUuidPda = findUsedUuidPDA(uuid);
 
         // Validate attestation first
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -442,7 +437,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -456,7 +451,7 @@ describe("Program Security Tests", () => {
             .cleanupExpiredUuid()
             .accounts({
               usedUuidAccount: usedUuidPda,
-              validatorRecipient: client.publicKey,
+              signerRecipient: client.publicKey,
             } as any)
             .rpc();
 
@@ -487,7 +482,7 @@ describe("Program Security Tests", () => {
         const initialBalance = await connection.getBalance(client.publicKey);
 
         // Validate attestation first (this should still work even if expiration check is loose)
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -508,7 +503,7 @@ describe("Program Security Tests", () => {
               attesterAccount: attesterPda,
               policyAccount,
               usedUuidAccount: usedUuidPda,
-              validator: client.publicKey,
+              signer: client.publicKey,
               systemProgram: SystemProgram.programId,
               instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
             } as any)
@@ -545,7 +540,7 @@ describe("Program Security Tests", () => {
 
         const usedUuidPda = findUsedUuidPDA(uuid);
 
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -565,7 +560,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
@@ -587,7 +582,7 @@ describe("Program Security Tests", () => {
 
         const usedUuidPda = findUsedUuidPDA(uuid);
 
-        const messageHash = createMessageHash(statement, client.publicKey);
+        const messageHash = createMessageHash(statement);
         const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash,
@@ -607,7 +602,7 @@ describe("Program Security Tests", () => {
             attesterAccount: attesterPda,
             policyAccount,
             usedUuidAccount: usedUuidPda,
-            validator: client.publicKey,
+            signer: client.publicKey,
             systemProgram: SystemProgram.programId,
             instructionsSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
           } as any)
