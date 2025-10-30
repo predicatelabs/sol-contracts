@@ -132,9 +132,10 @@ pub struct Increment<'info> {
     )]
     pub attester_account: Account<'info, AttesterAccount>,
 
-    /// Policy account for the counter owner
+    /// Policy account for this counter program
+    /// The policy is tied to the program ID, not individual users
     #[account(
-        seeds = [b"policy", counter.owner.as_ref()],
+        seeds = [b"policy", crate::ID.as_ref()],
         bump,
         seeds::program = predicate_registry_program.key()
     )]

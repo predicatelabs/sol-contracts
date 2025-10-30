@@ -43,15 +43,15 @@ pub struct AttesterDeregistered {
     pub timestamp: i64,
 }
 
-/// Event emitted when a policy ID is set for a client
+/// Event emitted when a policy ID is set for a client program
 #[event]
 pub struct PolicySet {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The client for whom the policy ID was set
-    pub client: Pubkey,
-    /// The account that set the policy ID (should be same as client)
-    pub setter: Pubkey,
+    /// The client program for which the policy ID was set
+    pub client_program: Pubkey,
+    /// The upgrade authority that set the policy ID
+    pub authority: Pubkey,
     /// The policy ID string
     pub policy_id: String,
     /// Timestamp when policy was set
@@ -99,8 +99,10 @@ pub struct AuthorityTransferred {
 pub struct PolicyUpdated {
     /// The public key of the registry account
     pub registry: Pubkey,
-    /// The client whose policy ID was updated
-    pub client: Pubkey,
+    /// The client program whose policy ID was updated
+    pub client_program: Pubkey,
+    /// The upgrade authority that updated the policy ID
+    pub authority: Pubkey,
     /// The previous policy ID string
     pub previous_policy_id: String,
     /// The new policy ID string

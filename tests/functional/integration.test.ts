@@ -1,5 +1,8 @@
 import { expect } from "chai";
-import { Keypair, SystemProgram } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { Counter } from "../../target/types/counter";
 import {
   setupSharedTestContext,
   SharedTestContext,
@@ -10,11 +13,15 @@ import {
   findPolicyPDA,
   registerAttester,
   setPolicyId,
+  setPolicyIdOrUpdate,
 } from "../helpers/test-utils";
 
 describe("Integration Tests", () => {
   let context: SharedTestContext;
   let newAuthority: Keypair;
+  let counterProgram: Program<Counter>;
+  let counterProgramId: PublicKey;
+  let predicateRegistryProgramId: PublicKey;
   let client1: Keypair;
   let client2: Keypair;
   let attester1: Keypair;
@@ -22,6 +29,11 @@ describe("Integration Tests", () => {
 
   before(async () => {
     context = await setupSharedTestContext();
+
+    // Get Counter program (policies are now set for programs, not users)
+    counterProgram = anchor.workspace.Counter as Program<Counter>;
+    counterProgramId = counterProgram.programId;
+    predicateRegistryProgramId = context.program.programId;
 
     // Create test accounts
     const newAuthorityAccount = await createTestAccount(context.provider);
@@ -104,16 +116,23 @@ describe("Integration Tests", () => {
         initialAttesters + 2
       );
 
-      // 3. Set policy IDs for multiple clients
+      // 3. Set policy IDs for multiple programs
+      // NOTE: In production, only CLIENT programs (like Counter) would have policies.
+      // We're setting a policy for PredicateRegistry here purely to test that the system
+      // can handle multiple programs having policies, not because the registry needs one.
       const policies = [
-        { client: client1, policyId: "x-client1-policy" },
-        { client: client2, policyId: "x-client2-policy" },
+        { programId: counterProgramId, policyId: "x-counter-policy" },
+        {
+          programId: predicateRegistryProgramId,
+          policyId: "x-registry-policy", // Test-only: registry doesn't need a policy in production
+        },
       ];
 
-      for (const { client, policyId } of policies) {
-        await setPolicyId(
+      for (const { programId, policyId } of policies) {
+        await setPolicyIdOrUpdate(
           context.program,
-          client,
+          programId,
+          context.authority.keypair,
           policyId,
           context.registry.registryPda
         );
@@ -130,13 +149,13 @@ describe("Integration Tests", () => {
         expect(attesterAccount.isRegistered).to.be.true;
       }
 
-      for (const { client, policyId } of policies) {
-        const [policyPda] = findPolicyPDA(
-          client.publicKey,
-          context.program.programId
-        );
+      for (const { programId, policyId } of policies) {
+        const [policyPda] = findPolicyPDA(programId, context.program.programId);
         const policyAccount = await context.program.account.policyAccount.fetch(
           policyPda
+        );
+        expect(policyAccount.clientProgram.toString()).to.equal(
+          programId.toString()
         );
         expect(policyAccount.policyId).to.equal(policyId);
       }
@@ -233,13 +252,16 @@ describe("Integration Tests", () => {
 
       // Verify policy account still exists and is correct
       const [policyPda] = findPolicyPDA(
-        client1.publicKey,
+        counterProgramId,
         context.program.programId
       );
       const policyAccount = await context.program.account.policyAccount.fetch(
         policyPda
       );
-      expect(policyAccount.policyId).to.equal("x-client1-policy");
+      expect(policyAccount.clientProgram.toString()).to.equal(
+        counterProgramId.toString()
+      );
+      expect(policyAccount.policyId).to.equal("x-counter-policy");
     });
   });
 
@@ -384,46 +406,46 @@ describe("Integration Tests", () => {
     });
 
     it("Should handle multiple policy operations correctly", async () => {
-      const clients: Keypair[] = [];
+      const programs = [
+        { programId: counterProgramId, name: "Counter" },
+        { programId: predicateRegistryProgramId, name: "Registry" },
+      ];
 
-      // Create and fund clients
-      for (let i = 0; i < 3; i++) {
-        const clientAccount = await createTestAccount(context.provider);
-        clients.push(clientAccount.keypair);
-      }
-
-      // Set policy IDs for all clients
-      for (let i = 0; i < clients.length; i++) {
-        const policyId = `x-policy-${i}`;
-        await setPolicyId(
+      // Set policy IDs for both programs
+      for (let i = 0; i < programs.length; i++) {
+        const policyId = `x-program-policy-${i}`;
+        await setPolicyIdOrUpdate(
           context.program,
-          clients[i],
+          programs[i].programId,
+          context.authority.keypair,
           policyId,
           context.registry.registryPda
         );
       }
 
       // Update all policies
-      for (let i = 0; i < clients.length; i++) {
+      for (let i = 0; i < programs.length; i++) {
         const [policyPda] = findPolicyPDA(
-          clients[i].publicKey,
+          programs[i].programId,
           context.program.programId
         );
-        const updatedPolicyId = `x-updated-policy-${i}`;
+        const updatedPolicyId = `x-updated-program-policy-${i}`;
 
-        await context.program.methods
-          .updatePolicyId(updatedPolicyId)
-          .accounts({
-            registry: context.registry.registryPda,
-            policyAccount: policyPda,
-            client: clients[i].publicKey,
-          } as any)
-          .signers([clients[i]])
-          .rpc();
+        // Use updatePolicyId helper
+        await setPolicyIdOrUpdate(
+          context.program,
+          programs[i].programId,
+          context.authority.keypair,
+          updatedPolicyId,
+          context.registry.registryPda
+        );
 
         // Verify update
         const policyAccount = await context.program.account.policyAccount.fetch(
           policyPda
+        );
+        expect(policyAccount.clientProgram.toString()).to.equal(
+          programs[i].programId.toString()
         );
         expect(policyAccount.policyId).to.equal(updatedPolicyId);
       }
@@ -496,10 +518,11 @@ describe("Integration Tests", () => {
           );
         },
         async () => {
-          await setPolicyId(
+          await setPolicyIdOrUpdate(
             context.program,
-            client3.keypair,
-            "x-policy1",
+            counterProgramId,
+            context.authority.keypair,
+            "x-counter-policy",
             context.registry.registryPda
           );
         },
@@ -512,27 +535,29 @@ describe("Integration Tests", () => {
           );
         },
         async () => {
-          await setPolicyId(
+          // Test setting policy for a second program (PredicateRegistry)
+          // NOTE: In production, the registry wouldn't need a policy - this is test-only
+          await setPolicyIdOrUpdate(
             context.program,
-            client4.keypair,
-            "x-policy2",
+            predicateRegistryProgramId,
+            context.authority.keypair,
+            "x-registry-policy",
             context.registry.registryPda
           );
         },
         async () => {
           const [policyPda] = findPolicyPDA(
-            client3.keypair.publicKey,
+            counterProgramId,
             context.program.programId
           );
-          await context.program.methods
-            .updatePolicyId("x-updated-policy1")
-            .accounts({
-              registry: context.registry.registryPda,
-              policyAccount: policyPda,
-              client: client3.keypair.publicKey,
-            } as any)
-            .signers([client3.keypair])
-            .rpc();
+          // Update counter program policy
+          await setPolicyIdOrUpdate(
+            context.program,
+            counterProgramId,
+            context.authority.keypair,
+            "x-updated-counter-policy",
+            context.registry.registryPda
+          );
         },
       ];
 
@@ -570,11 +595,11 @@ describe("Integration Tests", () => {
 
       // Verify policies
       const [policy1Pda] = findPolicyPDA(
-        client3.keypair.publicKey,
+        counterProgramId,
         context.program.programId
       );
       const [policy2Pda] = findPolicyPDA(
-        client4.keypair.publicKey,
+        predicateRegistryProgramId,
         context.program.programId
       );
 
@@ -585,8 +610,14 @@ describe("Integration Tests", () => {
         policy2Pda
       );
 
-      expect(policy1Account.policyId).to.equal("x-updated-policy1");
-      expect(policy2Account.policyId).to.equal("x-policy2");
+      expect(policy1Account.clientProgram.toString()).to.equal(
+        counterProgramId.toString()
+      );
+      expect(policy1Account.policyId).to.equal("x-updated-counter-policy");
+      expect(policy2Account.clientProgram.toString()).to.equal(
+        predicateRegistryProgramId.toString()
+      );
+      expect(policy2Account.policyId).to.equal("x-registry-policy");
     });
 
     it("Should handle registry statistics correctly across all operations", async () => {
@@ -779,29 +810,26 @@ describe("Integration Tests", () => {
 
   describe("Edge Cases and Boundary Conditions", () => {
     it("Should handle maximum policy length correctly", async () => {
-      const maxClientAccount = await createTestAccount(context.provider);
-      const maxClient = maxClientAccount.keypair;
-
       const [maxPolicyPda] = findPolicyPDA(
-        maxClient.publicKey,
+        counterProgramId,
         context.program.programId
       );
 
       const maxPolicyId = "x-" + "A".repeat(62); // Exactly 64 characters
 
-      await context.program.methods
-        .setPolicyId(maxPolicyId)
-        .accounts({
-          registry: context.registry.registryPda,
-          policyAccount: maxPolicyPda,
-          client: maxClient.publicKey,
-          systemProgram: SystemProgram.programId,
-        } as any)
-        .signers([maxClient])
-        .rpc();
+      await setPolicyIdOrUpdate(
+        context.program,
+        counterProgramId,
+        context.authority.keypair,
+        maxPolicyId,
+        context.registry.registryPda
+      );
 
       const policyAccount = await context.program.account.policyAccount.fetch(
         maxPolicyPda
+      );
+      expect(policyAccount.clientProgram.toString()).to.equal(
+        counterProgramId.toString()
       );
       expect(policyAccount.policyId).to.equal(maxPolicyId);
       expect(policyAccount.policyId.length).to.equal(64);

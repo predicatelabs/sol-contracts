@@ -38,7 +38,7 @@ pub use events::*;
 pub use errors::*;
 
 // Program ID
-declare_id!("8FZEdZxuRxeC4ENQrNF6fbeP1J1dNseSJStadHwaqpcJ");
+declare_id!("C4DUVQbRkwGLb56yWxuXBYYxmDR76GJ8t23hgvMHr6gB");
 
 /// Main program module containing all instruction handlers
 #[program]

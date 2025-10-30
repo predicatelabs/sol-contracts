@@ -13,6 +13,8 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { Counter } from "../../target/types/counter";
 import {
   Keypair,
   PublicKey,
@@ -41,6 +43,8 @@ import {
 describe("Program Security Tests", () => {
   describe("Signature Verification Security Tests", () => {
     let context: SharedTestContext;
+    let counterProgram: Program<Counter>;
+    let targetProgramId: PublicKey;
     let attester: Keypair;
     let client: Keypair;
     let validator: Keypair;
@@ -52,6 +56,10 @@ describe("Program Security Tests", () => {
     before(async () => {
       context = await setupSharedTestContext();
 
+      // Get Counter program (target for validation)
+      counterProgram = anchor.workspace.Counter as Program<Counter>;
+      targetProgramId = counterProgram.programId;
+
       // Create test accounts
       const attesterAccount = await createTestAccount(context.provider);
       attester = attesterAccount.keypair;
@@ -62,12 +70,12 @@ describe("Program Security Tests", () => {
       const validatorAccount = await createTestAccount(context.provider);
       validator = validatorAccount.keypair;
 
-      // Get PDAs
+      // Get PDAs - policy is for target program
       [attesterPda] = findAttesterPDA(
         attester.publicKey,
         context.program.programId
       );
-      [policyPda] = findPolicyPDA(client.publicKey, context.program.programId);
+      [policyPda] = findPolicyPDA(targetProgramId, context.program.programId);
 
       // Register attester
       await registerAttesterIfNotExists(
@@ -77,11 +85,12 @@ describe("Program Security Tests", () => {
         context.registry.registryPda
       );
 
-      // Set policy for client
+      // Set policy for target program
       try {
         await setPolicyId(
           context.program,
-          client,
+          targetProgramId,
+          context.authority.keypair,
           testPolicy,
           context.registry.registryPda
         );
@@ -113,8 +122,8 @@ describe("Program Security Tests", () => {
     function createStatement(uuid: Uint8Array, expiration: number) {
       return {
         uuid: Array.from(uuid),
-        msgSender: client.publicKey,
-        target: SystemProgram.programId,
+        msgSender: client.publicKey, // User calling the program
+        target: targetProgramId, // Program being called
         msgValue: new anchor.BN(0),
         encodedSigAndArgs: Buffer.from("test()"),
         policyId: testPolicy,

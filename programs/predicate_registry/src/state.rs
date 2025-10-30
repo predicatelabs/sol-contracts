@@ -34,11 +34,18 @@ pub struct AttesterAccount {
 }
 
 /// Account for storing client policy ID
+/// 
+/// Policies are owned by PROGRAMS, not users. This means:
+/// - The policy is tied to a specific client program (e.g., Counter, Token, DEX)
+/// - Only the program's upgrade authority can set or update the policy
+/// - Users are validated against the program's policy when calling it
 #[account]
 #[derive(InitSpace)]
 pub struct PolicyAccount {
-    /// The client's public key
-    pub client: Pubkey,
+    /// The client PROGRAM that owns this policy
+    pub client_program: Pubkey,
+    /// The upgrade authority that set this policy
+    pub authority: Pubkey,
     /// The policy ID (string identifier, not content)
     #[max_len(64)]
     pub policy_id: String,
@@ -164,11 +171,18 @@ impl AttesterAccount {
 
 impl PolicyAccount {
     /// Initialize a new policy account
-    pub fn initialize(&mut self, client: Pubkey, policy_id: String, clock: &Clock) -> Result<()> {
+    pub fn initialize(
+        &mut self, 
+        client_program: Pubkey,
+        authority: Pubkey,
+        policy_id: String, 
+        clock: &Clock
+    ) -> Result<()> {
         require!(policy_id.len() <= 64, crate::PredicateRegistryError::PolicyIdTooLong);
         require!(!policy_id.is_empty(), crate::PredicateRegistryError::InvalidPolicyId);
         
-        self.client = client;
+        self.client_program = client_program;
+        self.authority = authority;
         self.policy_id = policy_id;
         self.set_at = clock.unix_timestamp;
         self.updated_at = clock.unix_timestamp;
