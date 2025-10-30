@@ -63,8 +63,8 @@ pub struct Initialize<'info> {
     /// The predicate registry account
     pub predicate_registry: Account<'info, PredicateRegistryAccount>,
 
-    /// Policy account for THIS counter program (not the user)
-    /// CRITICAL CHANGE: Policy is now tied to the program, not the user
+    /// Policy account for this counter program
+    /// The policy is tied to the program ID, not individual users
     #[account(
         seeds = [b"policy", crate::ID.as_ref()],
         bump,

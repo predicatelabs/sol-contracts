@@ -199,9 +199,8 @@ pub struct UpdatePolicyId<'info> {
 
 /// Account validation context for validating an attestation
 /// 
-/// CRITICAL CHANGE: Policy is now derived from TARGET (program being called),
-/// not from SIGNER (user calling the program). This matches the Solidity model
-/// where policies are owned by contracts, not users.
+/// The policy is derived from the target program being called, not from the
+/// transaction signer. This ensures policies are tied to programs.
 #[derive(Accounts)]
 #[instruction(
     target: Pubkey,
@@ -285,8 +284,8 @@ pub struct CleanupExpiredUuid<'info> {
         close = signer_recipient,
         seeds = [b"used_uuid", &used_uuid_account.uuid],
         bump,
-        // CRITICAL: Enforce rent refund goes to the original payer
-        // This prevents attackers from stealing rent by passing their own address
+        // Enforce rent refund goes to the original payer
+        // This prevents unauthorized rent theft
         constraint = signer_recipient.key() == used_uuid_account.signer
             @ PredicateRegistryError::Unauthorized
     )]
