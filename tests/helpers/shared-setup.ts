@@ -103,8 +103,18 @@ export async function getSharedTestContext(): Promise<SharedTestContext> {
 
   const pda = findRegistryPDA(program.programId);
 
-  // Create test authority using persistent keypair
-  const authority = await createTestAuthority(provider);
+  // Create test authority using persistent keypair (funded by provider)
+  // NOTE: For policy setting to work, this authority must also be the upgrade authority
+  // of the programs. In Anchor tests, the provider wallet is the upgrade authority.
+  // So we use the provider wallet directly as our test authority.
+  const providerWallet = provider.wallet as anchor.Wallet;
+  const authority: TestAccount = {
+    keypair: providerWallet.payer,
+  };
+
+  console.log(
+    `Test authority (upgrade authority): ${authority.keypair.publicKey.toString()}`
+  );
 
   // Initialize registry
   const tx = await initializeRegistryIfNotExists(

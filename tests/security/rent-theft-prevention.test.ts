@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
+import { Counter } from "../../target/types/counter";
 import { expect } from "chai";
 import { Keypair, PublicKey, Ed25519Program } from "@solana/web3.js";
 import {
@@ -10,7 +11,9 @@ import {
 import {
   registerAttesterIfNotExists,
   setPolicyId,
+  setPolicyIdOrUpdate,
   findAttesterPDA,
+  findPolicyPDA,
 } from "../helpers/test-utils";
 import * as crypto from "crypto";
 import * as nacl from "tweetnacl";
@@ -19,6 +22,8 @@ describe("Program Security Tests", () => {
   describe("Rent Theft Prevention Tests", () => {
     let context: SharedTestContext;
     let program: Program<PredicateRegistry>;
+    let counterProgram: Program<Counter>;
+    let targetProgramId: PublicKey;
     let attester: Keypair;
     let attesterPda: PublicKey;
     let validator: Keypair;
@@ -30,6 +35,10 @@ describe("Program Security Tests", () => {
     before(async () => {
       context = await setupSharedTestContext();
       program = context.program;
+
+      // Get Counter program (target for validation)
+      counterProgram = anchor.workspace.Counter as Program<Counter>;
+      targetProgramId = counterProgram.programId;
 
       // Create test attester
       attester = Keypair.generate();
@@ -62,18 +71,16 @@ describe("Program Security Tests", () => {
         )
       );
 
-      // Set policy
-      await setPolicyId(
+      // Set policy for target program
+      await setPolicyIdOrUpdate(
         program,
-        validator,
+        targetProgramId,
+        context.authority.keypair,
         testPolicy,
         context.registry.registryPda
       );
 
-      [policyAccount] = PublicKey.findProgramAddressSync(
-        [Buffer.from("policy"), validator.publicKey.toBuffer()],
-        program.programId
-      );
+      [policyAccount] = findPolicyPDA(targetProgramId, program.programId);
     });
 
     /**
@@ -82,8 +89,8 @@ describe("Program Security Tests", () => {
     function createStatement(uuid: number[]): any {
       return {
         uuid: uuid,
-        msgSender: validator.publicKey,
-        target: anchor.web3.SystemProgram.programId,
+        msgSender: validator.publicKey, // User calling the program
+        target: targetProgramId, // Program being called
         msgValue: new anchor.BN(0),
         encodedSigAndArgs: Buffer.from("test()"),
         policyId: testPolicy,

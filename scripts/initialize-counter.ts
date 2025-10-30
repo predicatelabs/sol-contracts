@@ -9,9 +9,13 @@
  * 1. Load the program keypair from target/deploy/
  * 2. Use the configured wallet as the owner
  * 3. Ensure predicate registry is initialized
- * 4. Set a policy for the counter owner
+ * 4. Set a policy for the Counter PROGRAM (if not already set)
  * 5. Initialize a new counter instance
  * 6. Display the counter information
+ *
+ * NOTE: Policies are tied to PROGRAMS, not users. The Counter program's upgrade
+ * authority (typically the deployer) sets the policy that applies to all users
+ * who call the Counter program.
  */
 
 import * as anchor from "@coral-xyz/anchor";
@@ -21,6 +25,11 @@ import { PredicateRegistry } from "../target/types/predicate_registry";
 import { Counter } from "../target/types/counter";
 import * as fs from "fs";
 import * as path from "path";
+
+// BPF Loader Upgradeable Program ID (well-known constant)
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111"
+);
 
 // Configuration
 const CLUSTER_URL = process.env.ANCHOR_PROVIDER_URL || "http://127.0.0.1:8899";
@@ -195,16 +204,17 @@ function findPDAs(
     counterProgram.programId
   );
 
-  // Policy PDA
+  // Policy PDA - derived from COUNTER PROGRAM, not user
+  // Policies are owned by programs, not users
   const [policyPda, policyBump] = PublicKey.findProgramAddressSync(
-    [Buffer.from("policy"), owner.toBuffer()],
+    [Buffer.from("policy"), counterProgram.programId.toBuffer()],
     predicateProgram.programId
   );
 
   console.log("📍 PDAs calculated:");
   console.log(`   Registry: ${registryPda.toString()}`);
   console.log(`   Counter: ${counterPda.toString()}`);
-  console.log(`   Policy: ${policyPda.toString()}`);
+  console.log(`   Policy (for Counter program): ${policyPda.toString()}`);
 
   return {
     registryPda,
@@ -247,26 +257,37 @@ async function checkPolicyExists(
 }
 
 /**
- * Set policy for the counter owner
+ * Set policy for the Counter program
+ * NOTE: Only the program's upgrade authority can set the policy
  */
 async function setPolicyId(
   predicateProgram: Program<PredicateRegistry>,
-  owner: Keypair,
+  counterProgram: Program<Counter>,
+  upgradeAuthority: Keypair,
   registryPda: PublicKey,
   policyPda: PublicKey,
   policy: string = DEFAULT_POLICY
 ): Promise<string> {
-  console.log(`📝 Setting policy ID for owner: ${policy}`);
+  console.log(`📝 Setting policy ID for Counter program: ${policy}`);
+  console.log(`   Upgrade authority: ${upgradeAuthority.publicKey.toString()}`);
+
+  // Derive program data PDA
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [counterProgram.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+  );
 
   const tx = await predicateProgram.methods
-    .setPolicyId(policy)
+    .setPolicyId(counterProgram.programId, policy)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
-      client: owner.publicKey,
+      clientProgram: counterProgram.programId,
+      programData: programDataPda,
+      authority: upgradeAuthority.publicKey,
       systemProgram: SystemProgram.programId,
     } as any)
-    .signers([owner])
+    .signers([upgradeAuthority])
     .rpc();
 
   return tx;
@@ -385,16 +406,22 @@ async function main(): Promise<CounterInitializationResult> {
       pdas.policyPda
     );
     if (!policyExists) {
-      console.log("📝 Policy not found, setting default policy...");
+      console.log(
+        "📝 Policy not found for Counter program, setting default policy..."
+      );
+      console.log(
+        "   NOTE: This requires the wallet to be the Counter program's upgrade authority"
+      );
       const policyTx = await setPolicyId(
         predicateProgram,
-        owner,
+        counterProgram,
+        owner, // Assumes owner is the upgrade authority
         pdas.registryPda,
         pdas.policyPda
       );
       console.log(`✅ Policy set: ${policyTx}`);
     } else {
-      console.log("✅ Policy already exists");
+      console.log("✅ Policy already exists for Counter program");
     }
 
     // Check if counter already exists

@@ -1,4 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { Counter } from "../../target/types/counter";
 import {
   Keypair,
   PublicKey,
@@ -19,6 +21,7 @@ import {
   findPolicyPDA,
   registerAttesterIfNotExists,
   setPolicyId,
+  setPolicyIdOrUpdate,
   getFutureTimestamp,
   getPastTimestamp,
   expectError,
@@ -28,7 +31,9 @@ import {
 describe("Validate Attestation", () => {
   let context: SharedTestContext;
   let attester: Keypair;
-  let client: Keypair; // The actual client/signer
+  let client: Keypair; // The actual user/signer
+  let counterProgram: Program<Counter>;
+  let targetProgramId: PublicKey; // The program being called (policy is tied to this)
   let attesterPda: PublicKey;
   let policyPda: PublicKey;
 
@@ -38,6 +43,10 @@ describe("Validate Attestation", () => {
     // Set up shared context
     context = await setupSharedTestContext();
 
+    // Get Counter program (target for validation)
+    counterProgram = anchor.workspace.Counter as Program<Counter>;
+    targetProgramId = counterProgram.programId;
+
     // Create test accounts
     const attesterAccount = await createTestAccount(context.provider);
     attester = attesterAccount.keypair;
@@ -45,7 +54,7 @@ describe("Validate Attestation", () => {
     const clientAccount = await createTestAccount(context.provider);
     client = clientAccount.keypair;
 
-    // Get PDAs
+    // Get PDAs - policy is now tied to the TARGET program, not the user
     const [attesterPdaResult] = findAttesterPDA(
       attester.publicKey,
       context.program.programId
@@ -53,7 +62,7 @@ describe("Validate Attestation", () => {
     attesterPda = attesterPdaResult;
 
     const [policyPdaResult] = findPolicyPDA(
-      client.publicKey,
+      targetProgramId, // Policy is for the program being called
       context.program.programId
     );
     policyPda = policyPdaResult;
@@ -66,11 +75,12 @@ describe("Validate Attestation", () => {
       context.registry.registryPda
     );
 
-    // Set policy ID for client using helper function
+    // Set policy ID for the TARGET PROGRAM (not the user)
     try {
-      await setPolicyId(
+      await setPolicyIdOrUpdate(
         context.program,
-        client,
+        targetProgramId,
+        context.authority.keypair,
         testPolicy,
         context.registry.registryPda
       );
@@ -85,9 +95,9 @@ describe("Validate Attestation", () => {
   function createStatement(uuid: Uint8Array, expiration: number) {
     return {
       uuid: Array.from(uuid),
-      msgSender: client.publicKey,
-      target: new PublicKey("11111111111111111111111111111111"),
-      msgValue: new anchor.BN(1000000), // 1 SOL in lamports
+      msgSender: client.publicKey, // User calling the program
+      target: targetProgramId, // Program being called (policy is tied to this)
+      msgValue: new anchor.BN(0), // 0 for Solana
       encodedSigAndArgs: Buffer.from("test-encoded-data"),
       policyId: testPolicy,
       expiration: new anchor.BN(expiration),

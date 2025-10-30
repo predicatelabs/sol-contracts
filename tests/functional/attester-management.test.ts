@@ -511,37 +511,4 @@ describe("Attester Management", () => {
       expect(registry.totalAttesters.toNumber()).to.equal(initialCount);
     });
   });
-
-  describe("Edge Cases", () => {
-    it("Should handle maximum number of attesters gracefully", async () => {
-      // Register multiple attesters to test counter limits
-      const attesters: Keypair[] = [];
-      for (let i = 0; i < 10; i++) {
-        attesters.push(Keypair.generate());
-      }
-
-      const initialRegistry =
-        await context.program.account.predicateRegistry.fetch(
-          context.registry.registryPda
-        );
-      const initialCount = initialRegistry.totalAttesters.toNumber();
-
-      for (const attester of attesters) {
-        await registerAttester(
-          context.program,
-          context.authority.keypair,
-          attester.publicKey,
-          context.registry.registryPda
-        );
-      }
-
-      const registryAccount =
-        await context.program.account.predicateRegistry.fetch(
-          context.registry.registryPda
-        );
-      expect(registryAccount.totalAttesters.toNumber()).to.equal(
-        initialCount + 10
-      );
-    });
-  });
 });

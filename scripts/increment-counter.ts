@@ -222,9 +222,9 @@ function findPDAs(
     predicateProgram.programId
   );
 
-  // Policy PDA
+  // Policy PDA - derived from COUNTER PROGRAM, not user
   const [policyPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("policy"), owner.toBuffer()],
+    [Buffer.from("policy"), counterProgram.programId.toBuffer()],
     predicateProgram.programId
   );
 
@@ -232,7 +232,7 @@ function findPDAs(
   console.log(`   Registry: ${registryPda.toString()}`);
   console.log(`   Counter: ${counterPda.toString()}`);
   console.log(`   Attester: ${attesterPda.toString()}`);
-  console.log(`   Policy: ${policyPda.toString()}`);
+  console.log(`   Policy (for Counter program): ${policyPda.toString()}`);
 
   return { registryPda, counterPda, attesterPda, policyPda };
 }

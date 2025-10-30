@@ -5,6 +5,11 @@ import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import * as fs from "fs";
 import * as path from "path";
 
+// BPF Loader Upgradeable Program ID (well-known constant)
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111"
+);
+
 export interface TestRegistryPDA {
   registryPda: PublicKey;
   registryBump: number;
@@ -131,14 +136,15 @@ export function findAttesterPDA(
 }
 
 /**
- * Finds policy PDA for a given client public key
+ * Finds policy PDA for a given client program (not user)
+ * CRITICAL: Policy is now tied to the PROGRAM, not the user
  */
 export function findPolicyPDA(
-  client: PublicKey,
+  clientProgram: PublicKey,
   programId: PublicKey
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("policy"), client.toBuffer()],
+    [Buffer.from("policy"), clientProgram.toBuffer()],
     programId
   );
 }
@@ -243,48 +249,109 @@ export async function registerAttesterIfNotExists(
 }
 
 /**
- * Sets a policy ID for a client
+ * Sets a policy ID for a client program
+ * CRITICAL: Policy is now set for a PROGRAM, not a user
+ * Only the program's upgrade authority can call this
  */
 export async function setPolicyId(
   program: Program<PredicateRegistry>,
-  client: Keypair,
+  clientProgram: PublicKey,
+  authority: Keypair,
   policyId: string,
   registryPda: PublicKey
 ): Promise<string> {
-  const [policyPda] = findPolicyPDA(client.publicKey, program.programId);
+  const [policyPda] = findPolicyPDA(clientProgram, program.programId);
+
+  // Derive program data PDA
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [clientProgram.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+  );
 
   return await program.methods
-    .setPolicyId(policyId)
+    .setPolicyId(clientProgram, policyId)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
-      client: client.publicKey,
+      clientProgram: clientProgram,
+      programData: programDataPda,
+      authority: authority.publicKey,
       systemProgram: SystemProgram.programId,
     } as any)
-    .signers([client])
+    .signers([authority])
     .rpc();
 }
 
 /**
- * Updates a policy ID for a client
+ * Updates a policy ID for a client program
+ * CRITICAL: Policy is now updated for a PROGRAM, not a user
+ * Only the program's upgrade authority can call this
  */
 export async function updatePolicyId(
   program: Program<PredicateRegistry>,
-  client: Keypair,
+  clientProgram: PublicKey,
+  authority: Keypair,
   policyId: string,
   registryPda: PublicKey
 ): Promise<string> {
-  const [policyPda] = findPolicyPDA(client.publicKey, program.programId);
+  const [policyPda] = findPolicyPDA(clientProgram, program.programId);
+
+  // Derive program data PDA
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [clientProgram.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+  );
 
   return await program.methods
-    .updatePolicyId(policyId)
+    .updatePolicyId(clientProgram, policyId)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
-      client: client.publicKey,
+      clientProgram: clientProgram,
+      programData: programDataPda,
+      authority: authority.publicKey,
     } as any)
-    .signers([client])
+    .signers([authority])
     .rpc();
+}
+
+/**
+ * Sets or updates a policy ID for a client program (idempotent)
+ * Tries to set first, if account exists, updates instead
+ */
+export async function setPolicyIdOrUpdate(
+  program: Program<PredicateRegistry>,
+  clientProgram: PublicKey,
+  authority: Keypair,
+  policyId: string,
+  registryPda: PublicKey
+): Promise<string> {
+  try {
+    return await setPolicyId(
+      program,
+      clientProgram,
+      authority,
+      policyId,
+      registryPda
+    );
+  } catch (error: any) {
+    // If account already exists, update instead
+    const errorStr = JSON.stringify(error);
+    if (
+      error.message?.includes("already in use") ||
+      errorStr.includes("already in use") ||
+      error.logs?.some((log: string) => log.includes("already in use"))
+    ) {
+      return await updatePolicyId(
+        program,
+        clientProgram,
+        authority,
+        policyId,
+        registryPda
+      );
+    }
+    throw error;
+  }
 }
 
 /**
@@ -429,9 +496,10 @@ export function getAttesterPDA(programId: PublicKey, attester: PublicKey) {
 
 /**
  * Wrapper for findPolicyPDA to match expected interface
+ * CRITICAL: clientProgram is now a program address, not a user address
  */
-export function getPolicyPDA(programId: PublicKey, client: PublicKey) {
-  const [policyPda, policyBump] = findPolicyPDA(client, programId);
+export function getPolicyPDA(programId: PublicKey, clientProgram: PublicKey) {
+  const [policyPda, policyBump] = findPolicyPDA(clientProgram, programId);
   return {
     policyPda,
     policyBump,

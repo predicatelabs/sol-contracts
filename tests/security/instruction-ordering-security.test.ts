@@ -9,6 +9,8 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { Counter } from "../../target/types/counter";
 import {
   Keypair,
   PublicKey,
@@ -37,18 +39,23 @@ import {
 describe("Program Security Tests", () => {
   describe("Instruction Ordering & CPI Security Tests", () => {
     let context: SharedTestContext;
+    let counterProgram: Program<Counter>;
+    let targetProgramId: PublicKey;
     let attester: Keypair;
     let client1: Keypair;
     let client2: Keypair;
     let validator: Keypair;
     let attesterPda: PublicKey;
-    let policyPda1: PublicKey;
-    let policyPda2: PublicKey;
+    let policyPda: PublicKey;
 
     const testPolicy = "ordering-test-policy";
 
     before(async () => {
       context = await setupSharedTestContext();
+
+      // Get Counter program (target for validation)
+      counterProgram = anchor.workspace.Counter as Program<Counter>;
+      targetProgramId = counterProgram.programId;
 
       // Create test accounts
       const attesterAccount = await createTestAccount(context.provider);
@@ -63,19 +70,12 @@ describe("Program Security Tests", () => {
       const validatorAccount = await createTestAccount(context.provider);
       validator = validatorAccount.keypair;
 
-      // Get PDAs
+      // Get PDAs - policy is for target program
       [attesterPda] = findAttesterPDA(
         attester.publicKey,
         context.program.programId
       );
-      [policyPda1] = findPolicyPDA(
-        client1.publicKey,
-        context.program.programId
-      );
-      [policyPda2] = findPolicyPDA(
-        client2.publicKey,
-        context.program.programId
-      );
+      [policyPda] = findPolicyPDA(targetProgramId, context.program.programId);
 
       // Register attester
       await registerAttesterIfNotExists(
@@ -85,27 +85,17 @@ describe("Program Security Tests", () => {
         context.registry.registryPda
       );
 
-      // Set policies for both clients
+      // Set policy for target program (not users)
       try {
         await setPolicyId(
           context.program,
-          client1,
+          targetProgramId,
+          context.authority.keypair,
           testPolicy,
           context.registry.registryPda
         );
       } catch (error: any) {
-        console.log("Client1 policy already set:", error.message);
-      }
-
-      try {
-        await setPolicyId(
-          context.program,
-          client2,
-          testPolicy,
-          context.registry.registryPda
-        );
-      } catch (error: any) {
-        console.log("Client2 policy already set:", error.message);
+        console.log("Policy already set:", error.message);
       }
     });
 
@@ -137,7 +127,7 @@ describe("Program Security Tests", () => {
       return {
         uuid: Array.from(uuid),
         msgSender: msgSender,
-        target: SystemProgram.programId,
+        target: targetProgramId, // Program being called
         msgValue: new anchor.BN(0),
         encodedSigAndArgs: Buffer.from("test()"),
         policyId: testPolicy,
@@ -221,7 +211,7 @@ describe("Program Security Tests", () => {
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
-            policyAccount: policyPda1,
+            policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
             signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
@@ -286,7 +276,7 @@ describe("Program Security Tests", () => {
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
-            policyAccount: policyPda1,
+            policyAccount: policyPda,
             usedUuidAccount: usedUuidPda,
             signer: validator.publicKey,
             systemProgram: SystemProgram.programId,
@@ -367,7 +357,7 @@ describe("Program Security Tests", () => {
           .accounts({
             registry: context.registry.registryPda,
             attesterAccount: attesterPda,
-            policyAccount: policyPda2,
+            policyAccount: policyPda,
             usedUuidAccount: usedUuidPda2,
             signer: validator.publicKey,
             systemProgram: SystemProgram.programId,

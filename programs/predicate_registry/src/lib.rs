@@ -36,7 +36,7 @@ pub use errors::*;
 pub use events::*;
 
 // Program ID - This should be updated when you deploy
-declare_id!("gg929D9WoMes8gSQUuoYTL31TvTy4bXCZB2ruQdizNv");
+declare_id!("GjXtvmWihnf22Bg48srpzYrs6iGhSUvu1tzsf9L4u9Ck");
 
 /// Main program module containing all instruction handlers
 #[program]
@@ -104,13 +104,16 @@ pub mod predicate_registry {
         instructions::deregister_attester(ctx, attester)
     }
 
-    /// Set a policy ID for a client
+    /// Set a policy ID for a client program
     /// 
-    /// Allows a client to set their validation policy ID.
-    /// This policy ID will be used when validating statements from this client.
+    /// Creates a policy for a PROGRAM (not a user). Only the program's upgrade
+    /// authority can call this instruction. The policy is tied to the program
+    /// address, and all users calling that program will be validated against
+    /// this policy.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
+    /// * `client_program` - The program address that this policy applies to
     /// * `policy_id` - The policy ID string (max 64 bytes)
     /// 
     /// # Returns
@@ -122,16 +125,24 @@ pub mod predicate_registry {
     /// # Errors
     /// * `PolicyIdTooLong` - If policy ID exceeds 64 bytes
     /// * `InvalidPolicyId` - If policy ID is empty
-    pub fn set_policy_id(ctx: Context<SetPolicyId>, policy_id: String) -> Result<()> {
-        instructions::set_policy_id(ctx, policy_id)
+    /// * `Unauthorized` - If signer is not the program's upgrade authority
+    /// * `InvalidProgramData` - If program data account is invalid
+    pub fn set_policy_id(
+        ctx: Context<SetPolicyId>, 
+        client_program: Pubkey,
+        policy_id: String
+    ) -> Result<()> {
+        instructions::set_policy_id(ctx, client_program, policy_id)
     }
 
-    /// Update an existing policy ID for a client
+    /// Update an existing policy ID for a client program
     /// 
-    /// Allows a client to update their existing validation policy ID.
+    /// Updates a policy for a PROGRAM (not a user). Only the program's upgrade
+    /// authority can call this instruction.
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
+    /// * `client_program` - The program address that this policy applies to
     /// * `policy_id` - The new policy ID string (max 64 bytes)
     /// 
     /// # Returns
@@ -143,9 +154,16 @@ pub mod predicate_registry {
     /// # Errors
     /// * `PolicyIdTooLong` - If policy ID exceeds 64 bytes
     /// * `InvalidPolicyId` - If policy ID is empty
-    /// * `PolicyNotFound` - If no existing policy found for client
-    pub fn update_policy_id(ctx: Context<UpdatePolicyId>, policy_id: String) -> Result<()> {
-        instructions::update_policy_id(ctx, policy_id)
+    /// * `PolicyNotFound` - If no existing policy found for program
+    /// * `Unauthorized` - If signer is not the program's upgrade authority
+    /// * `InvalidProgramData` - If program data account is invalid
+    /// * `InvalidClientProgram` - If program doesn't match policy account
+    pub fn update_policy_id(
+        ctx: Context<UpdatePolicyId>, 
+        client_program: Pubkey,
+        policy_id: String
+    ) -> Result<()> {
+        instructions::update_policy_id(ctx, client_program, policy_id)
     }
 
     /// Validate an attestation for a transaction

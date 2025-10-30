@@ -8,6 +8,7 @@ import {
   Ed25519Program,
 } from "@solana/web3.js";
 import { PredicateRegistry } from "../../target/types/predicate_registry";
+import { Counter } from "../../target/types/counter";
 import {
   setupSharedTestContext,
   SharedTestContext,
@@ -15,7 +16,9 @@ import {
 import {
   registerAttesterIfNotExists,
   setPolicyId,
+  setPolicyIdOrUpdate,
   findAttesterPDA,
+  findPolicyPDA,
 } from "../helpers/test-utils";
 import nacl from "tweetnacl";
 import * as crypto from "crypto";
@@ -24,6 +27,8 @@ describe("Program Security Tests", () => {
   describe("UUID Replay Protection", () => {
     let context: SharedTestContext;
     let program: Program<PredicateRegistry>;
+    let counterProgram: Program<Counter>;
+    let targetProgramId: PublicKey;
     let attester: Keypair;
     let attesterPda: PublicKey;
     let client: Keypair;
@@ -32,6 +37,10 @@ describe("Program Security Tests", () => {
     before(async () => {
       context = await setupSharedTestContext();
       program = context.program;
+
+      // Get Counter program (target for validation)
+      counterProgram = anchor.workspace.Counter as Program<Counter>;
+      targetProgramId = counterProgram.programId;
 
       // Create test attester
       attester = Keypair.generate();
@@ -46,7 +55,7 @@ describe("Program Security Tests", () => {
 
       [attesterPda] = findAttesterPDA(attester.publicKey, program.programId);
 
-      // Create client and set policy
+      // Create client (user calling the program)
       client = Keypair.generate();
 
       // Airdrop SOL to client for transactions
@@ -57,17 +66,16 @@ describe("Program Security Tests", () => {
       );
       await connection.confirmTransaction(airdropSig);
 
-      await setPolicyId(
+      // Set policy for TARGET PROGRAM (not user)
+      await setPolicyIdOrUpdate(
         program,
-        client,
+        targetProgramId,
+        context.authority.keypair,
         "x-replay-test-policy",
         context.registry.registryPda
       );
 
-      [policyAccount] = PublicKey.findProgramAddressSync(
-        [Buffer.from("policy"), client.publicKey.toBuffer()],
-        program.programId
-      );
+      [policyAccount] = findPolicyPDA(targetProgramId, program.programId);
     });
 
     /**
@@ -76,8 +84,8 @@ describe("Program Security Tests", () => {
     function createStatement(uuid: number[]): any {
       return {
         uuid: uuid,
-        msgSender: client.publicKey,
-        target: SystemProgram.programId,
+        msgSender: client.publicKey, // User calling the program
+        target: targetProgramId, // Program being called
         msgValue: new BN(0),
         encodedSigAndArgs: Buffer.from("test()"),
         policyId: "x-replay-test-policy",

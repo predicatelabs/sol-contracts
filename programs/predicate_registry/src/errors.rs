@@ -113,4 +113,12 @@ pub enum PredicateRegistryError {
     /// Error when serialization/deserialization fails
     #[msg("Serialization error: Failed to serialize or deserialize data")]
     SerializationError,
+    
+    /// Error when program data account is invalid
+    #[msg("Invalid program data: Program data account is invalid or cannot be deserialized")]
+    InvalidProgramData,
+    
+    /// Error when client program doesn't match policy account
+    #[msg("Client program mismatch: Client program does not match policy account")]
+    InvalidClientProgram,
 }

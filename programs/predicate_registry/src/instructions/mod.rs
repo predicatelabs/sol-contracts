@@ -107,7 +107,13 @@ pub struct DeregisterAttester<'info> {
 }
 
 /// Account validation context for setting a policy ID
+/// 
+/// Policies are owned by PROGRAMS, not users. This context:
+/// - Creates a policy PDA derived from the client program's address
+/// - Verifies the signer is the program's upgrade authority
+/// - Stores both the program address and the authority
 #[derive(Accounts)]
+#[instruction(client_program: Pubkey)]
 pub struct SetPolicyId<'info> {
     /// The registry account (for event emission and stats tracking)
     #[account(
@@ -117,48 +123,85 @@ pub struct SetPolicyId<'info> {
     )]
     pub registry: Account<'info, PredicateRegistry>,
     
-    /// The policy account to be created
+    /// The policy account to be created (derived from client program, not user)
     #[account(
         init,
-        payer = client,
+        payer = authority,
         space = 8 + PolicyAccount::INIT_SPACE,
-        seeds = [b"policy", client.key().as_ref()],
+        seeds = [b"policy", client_program.key().as_ref()],
         bump
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
-    /// The client setting the policy
+    /// The client program that this policy applies to
+    /// CHECK: Can be any program address; verified via program_data
+    pub client_program: AccountInfo<'info>,
+    
+    /// The program data account for the client program
+    /// This is used to verify the upgrade authority
+    /// CHECK: Verified via seeds and deserialization in instruction logic
+    #[account(
+        seeds = [client_program.key().as_ref()],
+        bump,
+        seeds::program = anchor_lang::solana_program::bpf_loader_upgradeable::ID,
+    )]
+    pub program_data: AccountInfo<'info>,
+    
+    /// The upgrade authority of the client program
     #[account(mut)]
-    pub client: Signer<'info>,
+    pub authority: Signer<'info>,
     
     /// System program for account creation
     pub system_program: Program<'info, System>,
 }
 
 /// Account validation context for updating a policy ID
+/// 
+/// Updates an existing policy for a PROGRAM. Only the program's upgrade
+/// authority can call this instruction.
 #[derive(Accounts)]
+#[instruction(client_program: Pubkey)]
 pub struct UpdatePolicyId<'info> {
     /// The registry account (for event emission)
     #[account(
+        mut,
         seeds = [b"predicate_registry"],
         bump
     )]
     pub registry: Account<'info, PredicateRegistry>,
     
-    /// The policy account to be updated
+    /// The policy account to be updated (derived from client program)
     #[account(
         mut,
-        seeds = [b"policy", client.key().as_ref()],
+        seeds = [b"policy", client_program.key().as_ref()],
         bump,
-        constraint = policy_account.client == client.key() @ PredicateRegistryError::Unauthorized
+        constraint = policy_account.client_program == client_program.key() @ PredicateRegistryError::InvalidClientProgram
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
-    /// The client updating the policy
-    pub client: Signer<'info>,
+    /// The client program (for PDA derivation)
+    /// CHECK: Verified via policy_account constraint
+    pub client_program: AccountInfo<'info>,
+    
+    /// The program data account for the client program
+    /// CHECK: Verified via seeds and deserialization in instruction logic
+    #[account(
+        seeds = [client_program.key().as_ref()],
+        bump,
+        seeds::program = anchor_lang::solana_program::bpf_loader_upgradeable::ID,
+    )]
+    pub program_data: AccountInfo<'info>,
+    
+    /// The upgrade authority of the client program
+    #[account(mut)]
+    pub authority: Signer<'info>,
 }
 
 /// Account validation context for validating an attestation
+/// 
+/// CRITICAL CHANGE: Policy is now derived from TARGET (program being called),
+/// not from SIGNER (user calling the program). This matches the Solidity model
+/// where policies are owned by contracts, not users.
 #[derive(Accounts)]
 #[instruction(
     target: Pubkey,
@@ -184,11 +227,12 @@ pub struct ValidateAttestation<'info> {
     )]
     pub attester_account: Account<'info, AttesterAccount>,
     
-    /// The policy account for the transaction signer
-    /// Note: We derive this from signer.key(), not from client-provided data
+    /// The policy account for the TARGET PROGRAM (not the user)
+    /// This is the key change: policy is tied to the program being called
     #[account(
-        seeds = [b"policy", signer.key().as_ref()],
-        bump
+        seeds = [b"policy", target.as_ref()],
+        bump,
+        constraint = policy_account.client_program == target @ PredicateRegistryError::InvalidClientProgram
     )]
     pub policy_account: Account<'info, PolicyAccount>,
     
@@ -203,7 +247,7 @@ pub struct ValidateAttestation<'info> {
     )]
     pub used_uuid_account: Account<'info, UsedUuidAccount>,
     
-    /// The transaction signer (also payer for UUID account)
+    /// The user calling the program (validated against program's policy)
     #[account(mut)]
     pub signer: Signer<'info>,
     
