@@ -1,6 +1,6 @@
 # Predicate Registry - Solana Programs
 
-A decentralized attestation validation system for Solana programs. The Predicate Registry enables programs to validate off-chain attestations before executing protected operations.
+A trusted attestation validation system for Solana programs. The Predicate Registry enables programs to validate offchain attestations before executing protected operations.
 
 ## Architecture Overview
 
@@ -33,7 +33,7 @@ Policy PDA = ["policy", client_program_id]
 - Policy contains a `policy_id` string (e.g., `"x-abc123"`) that identifies validation rules stored off-chain
 
 **Why program-based?**
-- Programs like DEXs, DAOs, or games need consistent validation rules for all users
+- The program represents a protected onchain
 - Upgrade authorities control program logic and security policies together
 - Simplifies validation: one policy per program instead of per user
 
@@ -124,9 +124,9 @@ A simple counter with protected increment operations. Demonstrates the **inherit
 
 **Use Case**: Programs with specific protected operations (e.g., token transfers, DEX swaps, DAO votes)
 
-### Demo Customer Stub
+### Demo Policy Holding Program
 
-A minimal stub program serving as a policy anchor in the registry.
+A minimal stub program used to register policy IDs.
 
 **Purpose**: Placeholder for customers who need a policy ID but haven't deployed custom logic yet
 
@@ -195,12 +195,12 @@ UsedUuidAccount (PDA: ["used_uuid", uuid_bytes])
   - Sysvar access (Clock, Instructions)
 
 - **solana-verify**: Deterministic build toolchain for program verification
-  - Enables on-chain verification of program source code
+  - Enables onchain verification of program source code
   - Used by block explorers (Solscan, Osec) for verified badges
 
 ## Security Features
 
-- **Replay Protection**: UUIDs are tracked in on-chain accounts; reuse is prevented
+- **Replay Protection**: UUIDs are tracked in onchain accounts; reuse is prevented
 - **Upgrade Authority Verification**: Policy management requires proof of program ownership via BPF Loader Upgradeable's program data account
 - **Expiration Enforcement**: Both statements and attestations have expiration timestamps
 - **Signature Verification**: Ed25519 signatures validated via Solana's native program
