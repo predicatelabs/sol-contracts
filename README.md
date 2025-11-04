@@ -33,9 +33,8 @@ Policy PDA = ["policy", client_program_id]
 - Policy contains a `policy_id` string (e.g., `"x-abc123"`) that identifies validation rules stored off-chain
 
 **Why program-based?**
-- The program represents a protected onchain
-- Upgrade authorities control program logic and security policies together
-- Simplifies validation: one policy per program instead of per user
+- Protects _all_ transactions, regardless of caller
+- Restricts policy operations to the program's upgrade authority
 
 ### Statement Structure
 
