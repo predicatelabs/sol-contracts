@@ -103,13 +103,18 @@ describe("Program Security Tests", () => {
      * Helper: Create message hash
      */
     function createMessageHash(statement: any): Buffer {
+      // Hash variable-length fields separately to prevent collisions
+      const encodedSigAndArgsHash = crypto.createHash("sha256").update(Buffer.from(statement.encodedSigAndArgs)).digest();
+      const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
+      
+      // Concatenate fixed-length fields with hashed variable-length fields
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
         statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
-        Buffer.from(statement.encodedSigAndArgs),
-        Buffer.from(statement.policyId, "utf8"),
+        encodedSigAndArgsHash,
+        policyIdHash,
         Buffer.from(statement.expiration.toBuffer("le", 8)),
       ]);
 
@@ -144,7 +149,7 @@ describe("Program Security Tests", () => {
       statement: any,
       validatorKey: PublicKey
     ) {
-      const messageHash = createMessageHash(statement, validatorKey);
+      const messageHash = createMessageHash(statement);
       const signature = nacl.sign.detached(
         messageHash,
         attesterKeypair.secretKey
@@ -337,7 +342,7 @@ describe("Program Security Tests", () => {
         const transaction = new Transaction();
 
         // Instruction 0: Ed25519 for statement1
-        const messageHash1 = createMessageHash(statement1, validator.publicKey);
+        const messageHash1 = createMessageHash(statement1);
         const ed25519Ix1 = Ed25519Program.createInstructionWithPublicKey({
           publicKey: attester.publicKey.toBytes(),
           message: messageHash1,

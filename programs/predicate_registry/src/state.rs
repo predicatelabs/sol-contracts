@@ -216,16 +216,25 @@ impl Statement {
     }
 
     /// Hash the statement for signature verification (equivalent to hashStatementSafe in Solidity)
+    /// 
+    /// Security: Variable-length fields (encoded_sig_and_args and policy_id) are hashed separately
+    /// before concatenation to prevent hash collisions. This ensures that different combinations
+    /// of these fields cannot produce the same final hash.
     pub fn hash_statement_safe(&self) -> [u8; 32] {
         use anchor_lang::solana_program::hash::hash;
         
+        // Hash variable-length fields separately to prevent collisions
+        let encoded_sig_and_args_hash = hash(&self.encoded_sig_and_args).to_bytes();
+        let policy_id_hash = hash(self.policy_id.as_bytes()).to_bytes();
+        
+        // Concatenate fixed-length fields with hashed variable-length fields
         let mut data = Vec::new();
         data.extend_from_slice(&self.uuid);
         data.extend_from_slice(&self.msg_sender.to_bytes());
         data.extend_from_slice(&self.target.to_bytes()); 
         data.extend_from_slice(&self.msg_value.to_le_bytes());
-        data.extend_from_slice(&self.encoded_sig_and_args);
-        data.extend_from_slice(self.policy_id.as_bytes());
+        data.extend_from_slice(&encoded_sig_and_args_hash);
+        data.extend_from_slice(&policy_id_hash);
         data.extend_from_slice(&self.expiration.to_le_bytes());
         
         hash(&data).to_bytes()
