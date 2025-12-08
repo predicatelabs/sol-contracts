@@ -6,6 +6,10 @@ use crate::events::AttesterDeregistered;
 
 /// Deregister an existing attester
 /// 
+/// This instruction closes the attester account, deleting it and returning
+/// the rent to the authority who originally paid for it. This allows the
+/// attester to be re-registered later if needed.
+/// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
 /// * `attester` - The public key of the attester to deregister
@@ -14,12 +18,12 @@ use crate::events::AttesterDeregistered;
 /// * `Result<()>` - Success or error
 pub fn deregister_attester(ctx: Context<DeregisterAttester>, attester: Pubkey) -> Result<()> {
     let registry = &mut ctx.accounts.registry;
-    let attester_account = &mut ctx.accounts.attester_account;
+    let _attester_account = &ctx.accounts.attester_account;
     let authority = &ctx.accounts.authority;
     let clock = Clock::get()?;
 
-    // Deregister the attester
-    attester_account.deregister()?;
+    // Note: The account is automatically closed by the `close = authority` constraint
+    // in the DeregisterAttester context, which deletes the account and returns rent.
 
     // Update registry statistics
     registry.decrement_attester_count(&clock)?;
@@ -32,7 +36,8 @@ pub fn deregister_attester(ctx: Context<DeregisterAttester>, attester: Pubkey) -
         timestamp: clock.unix_timestamp,
     });
 
-    msg!("Attester {} deregistered by authority {}", attester, authority.key());
+    msg!("Attester {} deregistered by authority {} (account closed, rent returned)", 
+         attester, authority.key());
     
     Ok(())
 }

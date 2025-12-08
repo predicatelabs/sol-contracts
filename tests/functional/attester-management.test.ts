@@ -272,6 +272,11 @@ describe("Attester Management", () => {
         );
       const totalAttestersBefore = registryBefore.totalAttesters.toNumber();
 
+      // Verify account exists before deregistration
+      const attesterAccountBefore =
+        await context.program.account.attesterAccount.fetch(attesterPda);
+      expect(attesterAccountBefore.isRegistered).to.be.true;
+
       await context.program.methods
         .deregisterAttester(attester1.keypair.publicKey)
         .accounts({
@@ -282,13 +287,13 @@ describe("Attester Management", () => {
         .signers([context.authority.keypair])
         .rpc();
 
-      // Verify attester is deregistered
-      const attesterAccount =
+      // Verify account is deleted (should fail to fetch)
+      try {
         await context.program.account.attesterAccount.fetch(attesterPda);
-      expect(attesterAccount.isRegistered).to.be.false;
-      expect(attesterAccount.attester.toString()).to.equal(
-        attester1.keypair.publicKey.toString()
-      );
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(error.message).to.include("Account does not exist or has no data");
+      }
 
       // Verify registry statistics
       const registryAfter =
@@ -370,7 +375,7 @@ describe("Attester Management", () => {
         context.program.programId
       );
 
-      // First deregister
+      // First deregister (account will be deleted)
       await context.program.methods
         .deregisterAttester(attester1.keypair.publicKey)
         .accounts({
@@ -381,7 +386,15 @@ describe("Attester Management", () => {
         .signers([context.authority.keypair])
         .rpc();
 
-      // Try to deregister again
+      // Verify account is deleted
+      try {
+        await context.program.account.attesterAccount.fetch(attesterPda);
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(error.message).to.include("Account does not exist or has no data");
+      }
+
+      // Try to deregister again (should fail because account doesn't exist)
       try {
         await context.program.methods
           .deregisterAttester(attester1.keypair.publicKey)
@@ -395,7 +408,8 @@ describe("Attester Management", () => {
 
         expect.fail("Should have thrown an error");
       } catch (error: any) {
-        expect(error.message).to.include("AttesterNotRegistered");
+        // Account doesn't exist, so it should fail with AccountNotInitialized
+        expect(error.message).to.include("AccountNotInitialized");
       }
     });
 
@@ -419,6 +433,8 @@ describe("Attester Management", () => {
 
         expect.fail("Should have thrown an error");
       } catch (error: any) {
+        // For non-existent accounts, Anchor throws AccountNotInitialized error
+        // (different from deleted accounts which throw "Account does not exist or has no data")
         expect(error.message).to.include("AccountNotInitialized");
       }
     });
@@ -440,6 +456,16 @@ describe("Attester Management", () => {
         context.registry.registryPda
       );
 
+      // Verify registered
+      let attesterAccount = await context.program.account.attesterAccount.fetch(
+        attesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
+        attester1.keypair.publicKey.toString()
+      );
+
+      // Deregister (this should delete the account)
       await context.program.methods
         .deregisterAttester(attester1.keypair.publicKey)
         .accounts({
@@ -450,23 +476,95 @@ describe("Attester Management", () => {
         .signers([context.authority.keypair])
         .rpc();
 
-      // Verify deregistered
-      let attesterAccount = await context.program.account.attesterAccount.fetch(
+      // Verify account is deleted (should fail to fetch)
+      try {
+        await context.program.account.attesterAccount.fetch(attesterPda);
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(error.message).to.include("Account does not exist or has no data");
+      }
+
+      // Re-register should now work (account was deleted, so init will succeed)
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+
+      // Verify re-registered
+      attesterAccount = await context.program.account.attesterAccount.fetch(
         attesterPda
       );
-      expect(attesterAccount.isRegistered).to.be.false;
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
+        attester1.keypair.publicKey.toString()
+      );
+    });
 
-      // Re-register should work but fail because account already exists
-      try {
-        await registerAttester(
-          context.program,
-          context.authority.keypair,
-          attester1.keypair.publicKey,
-          context.registry.registryPda
+    it("Should delete account and return rent when deregistering", async () => {
+      const attester1 = await createTestAccount(context.provider);
+      const [attesterPda] = findAttesterPDA(
+        attester1.keypair.publicKey,
+        context.program.programId
+      );
+
+      // Get authority balance before registration
+      const authorityBalanceBefore = await context.provider.connection.getBalance(
+        context.authority.keypair.publicKey
+      );
+
+      // Register attester (authority pays rent)
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+
+      // Get authority balance after registration (should be less due to rent)
+      const authorityBalanceAfterRegistration =
+        await context.provider.connection.getBalance(
+          context.authority.keypair.publicKey
         );
-        expect.fail("Should have thrown an error");
+      const rentPaid = authorityBalanceBefore - authorityBalanceAfterRegistration;
+      expect(rentPaid).to.be.greaterThan(0);
+
+      // Verify account exists
+      const attesterAccountBefore = await context.program.account.attesterAccount.fetch(
+        attesterPda
+      );
+      expect(attesterAccountBefore.isRegistered).to.be.true;
+
+      // Deregister (should delete account and return rent)
+      await context.program.methods
+        .deregisterAttester(attester1.keypair.publicKey)
+        .accounts({
+          registry: context.registry.registryPda,
+          attesterAccount: attesterPda,
+          authority: context.authority.keypair.publicKey,
+        })
+        .signers([context.authority.keypair])
+        .rpc();
+
+      // Get authority balance after deregistration (should have rent returned)
+      const authorityBalanceAfterDeregistration =
+        await context.provider.connection.getBalance(
+          context.authority.keypair.publicKey
+        );
+      const rentReturned =
+        authorityBalanceAfterDeregistration - authorityBalanceAfterRegistration;
+
+      // Rent should be returned (allowing for transaction fees)
+      // We check that balance increased significantly (most of rent returned)
+      expect(rentReturned).to.be.greaterThan(rentPaid * 0.9); // At least 90% of rent returned
+
+      // Verify account no longer exists
+      try {
+        await context.program.account.attesterAccount.fetch(attesterPda);
+        expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("already in use");
+        expect(error.message).to.include("Account does not exist or has no data");
       }
     });
 
@@ -490,7 +588,7 @@ describe("Attester Management", () => {
       );
       expect(registry.totalAttesters.toNumber()).to.equal(initialCount + 1);
 
-      // Deregister
+      // Deregister (account deleted)
       const [attesterPda] = findAttesterPDA(
         attester1.keypair.publicKey,
         context.program.programId
@@ -509,6 +607,113 @@ describe("Attester Management", () => {
         context.registry.registryPda
       );
       expect(registry.totalAttesters.toNumber()).to.equal(initialCount);
+
+      // Re-register (should increment count again)
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+      registry = await context.program.account.predicateRegistry.fetch(
+        context.registry.registryPda
+      );
+      expect(registry.totalAttesters.toNumber()).to.equal(initialCount + 1);
+
+      // Verify account exists and is registered
+      const attesterAccount = await context.program.account.attesterAccount.fetch(
+        attesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
+        attester1.keypair.publicKey.toString()
+      );
+    });
+
+    it("Should handle multiple deregister and re-register cycles", async () => {
+      const attester1 = await createTestAccount(context.provider);
+      const [attesterPda] = findAttesterPDA(
+        attester1.keypair.publicKey,
+        context.program.programId
+      );
+
+      // First cycle: register -> deregister -> re-register
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+
+      await context.program.methods
+        .deregisterAttester(attester1.keypair.publicKey)
+        .accounts({
+          registry: context.registry.registryPda,
+          attesterAccount: attesterPda,
+          authority: context.authority.keypair.publicKey,
+        })
+        .signers([context.authority.keypair])
+        .rpc();
+
+      // Verify account deleted
+      try {
+        await context.program.account.attesterAccount.fetch(attesterPda);
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(
+          error.message.includes("AccountNotInitialized") ||
+            error.message.includes("Account does not exist") ||
+            error.message.includes("Invalid account data")
+        ).to.be.true;
+      }
+
+      // Re-register
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+
+      let attesterAccount = await context.program.account.attesterAccount.fetch(
+        attesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+
+      // Second cycle: deregister -> re-register again
+      await context.program.methods
+        .deregisterAttester(attester1.keypair.publicKey)
+        .accounts({
+          registry: context.registry.registryPda,
+          attesterAccount: attesterPda,
+          authority: context.authority.keypair.publicKey,
+        })
+        .signers([context.authority.keypair])
+        .rpc();
+
+      // Verify account deleted again
+      try {
+        await context.program.account.attesterAccount.fetch(attesterPda);
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(error.message).to.include("Account does not exist or has no data");
+      }
+
+      // Re-register again
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        attester1.keypair.publicKey,
+        context.registry.registryPda
+      );
+
+      attesterAccount = await context.program.account.attesterAccount.fetch(
+        attesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
+        attester1.keypair.publicKey.toString()
+      );
     });
   });
 });
