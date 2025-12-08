@@ -18,6 +18,17 @@ pub mod validate_attestation;
 pub mod cleanup_expired_uuid;
 pub mod transfer_authority;
 
+/// Clock drift buffer for attestation expiration validation
+/// 
+/// This constant defines the time window (in seconds) after an attestation's
+/// expiration time during which the attestation is still considered valid.
+/// This buffer accounts for clock drift between different systems.
+/// 
+/// This value must be consistent across:
+/// - `validate_attestation`: Allows validation if `current_timestamp <= expiration + CLOCK_DRIFT_BUFFER`
+/// - `cleanup_expired_uuid`: Prevents cleanup if `current_timestamp <= expiration + CLOCK_DRIFT_BUFFER`
+pub const CLOCK_DRIFT_BUFFER: i64 = 30; // 30 seconds
+
 // Re-export instruction functions
 pub use initialize::*;
 pub use register_attester::*;

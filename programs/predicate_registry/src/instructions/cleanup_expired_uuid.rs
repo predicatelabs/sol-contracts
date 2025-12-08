@@ -7,7 +7,8 @@ use crate::errors::PredicateRegistryError;
 /// Cleanup an expired UUID account to reclaim rent
 /// 
 /// This function allows anyone to close a UsedUuidAccount after the statement
-/// has expired, returning the rent to the original signer (payer).
+/// has expired AND the validation buffer window has passed, returning the rent
+/// to the original signer (payer).
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
@@ -16,7 +17,9 @@ use crate::errors::PredicateRegistryError;
 /// * `Result<()>` - Ok if cleanup successful
 /// 
 /// # Security Considerations
-/// - Only allows cleanup after statement expiration
+/// - Only allows cleanup after statement expiration + validation buffer
+/// - Prevents replay attacks by ensuring UUID accounts cannot be cleaned up
+///   while attestations are still valid for validation
 /// - Enforces rent return to the original payer
 /// - Anyone can trigger cleanup
 pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
@@ -26,9 +29,12 @@ pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
     let clock = Clock::get().map_err(|_| PredicateRegistryError::ClockError)?;
     let current_timestamp = clock.unix_timestamp;
     
-    // Check that the statement has expired
+    // Check that the statement has expired AND the validation buffer window has passed
+    // This matches the validation logic which allows attestations to be valid for
+    // up to CLOCK_DRIFT_BUFFER seconds after expiration.
+    // We must prevent cleanup during this window to maintain replay protection.
     require!(
-        current_timestamp > used_uuid_account.expires_at,
+        current_timestamp > used_uuid_account.expires_at + crate::instructions::CLOCK_DRIFT_BUFFER,
         PredicateRegistryError::StatementNotExpired
     );
     

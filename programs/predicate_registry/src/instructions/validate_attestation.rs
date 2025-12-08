@@ -78,9 +78,8 @@ pub fn validate_attestation(
     // === BUSINESS LOGIC VALIDATION ===
 
     // Check if statement has expired (with small buffer for clock drift)
-    const CLOCK_DRIFT_BUFFER: i64 = 30; // 30 seconds buffer
     require!(
-        current_timestamp <= statement.expiration + CLOCK_DRIFT_BUFFER,
+        current_timestamp <= statement.expiration + crate::instructions::CLOCK_DRIFT_BUFFER,
         PredicateRegistryError::StatementExpired
     );
 
