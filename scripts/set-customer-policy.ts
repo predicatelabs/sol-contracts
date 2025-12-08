@@ -104,7 +104,7 @@ async function setCustomerPolicy(customerProgramId: string, policyId: string) {
     if (error.message?.includes("Account does not exist")) {
       console.log("📝 Setting new policy...");
       const tx = await program.methods
-        .setPolicyId(customerProgram, policyId)
+        .setPolicyId(policyId)
         .accounts({
           registry: registryPda,
           policyAccount: policyPda,

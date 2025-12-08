@@ -12,7 +12,6 @@ use crate::errors::PredicateRegistryError;
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `client_program` - The program address that this policy applies to
 /// * `policy_id` - The policy ID string to set
 /// 
 /// # Returns
@@ -21,9 +20,9 @@ use crate::errors::PredicateRegistryError;
 /// # Security
 /// - Verifies the signer is the program's upgrade authority
 /// - Policy PDA is derived from the program address, not the user
+/// - The client_program value stored in PolicyAccount matches the PDA derivation source
 pub fn set_policy_id(
     ctx: Context<SetPolicyId>, 
-    client_program: Pubkey,
     policy_id: String
 ) -> Result<()> {
     require!(!policy_id.is_empty(), PredicateRegistryError::InvalidPolicyId);
@@ -69,6 +68,10 @@ pub fn set_policy_id(
     let registry = &mut ctx.accounts.registry;
     let policy_account = &mut ctx.accounts.policy_account;
     let clock = Clock::get()?;
+
+    // Get the client_program from the account's key
+    // The PDA is derived from client_program.key() in the account validation
+    let client_program = ctx.accounts.client_program.key();
 
     // Initialize with client_program and authority
     policy_account.initialize(

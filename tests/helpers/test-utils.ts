@@ -269,7 +269,7 @@ export async function setPolicyId(
   );
 
   return await program.methods
-    .setPolicyId(clientProgram, policyId)
+    .setPolicyId(policyId)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,
