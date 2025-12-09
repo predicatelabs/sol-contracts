@@ -4,6 +4,8 @@ import { PredicateRegistry } from "../../target/types/predicate_registry";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
+import nacl from "tweetnacl";
 
 // BPF Loader Upgradeable Program ID (well-known constant)
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
@@ -504,4 +506,58 @@ export function getPolicyPDA(programId: PublicKey, clientProgram: PublicKey) {
     policyPda,
     policyBump,
   };
+}
+
+/**
+ * Creates a message hash for statement signing (matching hash_statement_safe in Rust)
+ *
+ * This function matches the Rust implementation in state.rs exactly:
+ * - Includes domain separator to prevent signature reuse across contexts
+ * - Hashes variable-length fields separately to prevent collisions
+ *
+ * @param statement - The statement object with uuid, msgSender, target, msgValue, encodedSigAndArgs, policyId, expiration
+ * @returns Buffer containing the 32-byte hash
+ */
+export function createMessageHash(statement: any): Buffer {
+  // Domain separator to prevent signature reuse across contexts
+  const domainSeparator = Buffer.from("predicate_solana_attestation");
+
+  // Hash variable-length fields separately to prevent collisions
+  const encodedSigAndArgsHash = crypto
+    .createHash("sha256")
+    .update(Buffer.from(statement.encodedSigAndArgs))
+    .digest();
+  const policyIdHash = crypto
+    .createHash("sha256")
+    .update(Buffer.from(statement.policyId, "utf8"))
+    .digest();
+
+  // Concatenate domain separator with fixed-length fields and hashed variable-length fields
+  const data = Buffer.concat([
+    domainSeparator,
+    Buffer.from(statement.uuid),
+    statement.msgSender.toBuffer(),
+    statement.target.toBuffer(),
+    Buffer.from(statement.msgValue.toBuffer("le", 8)),
+    encodedSigAndArgsHash,
+    policyIdHash,
+    Buffer.from(statement.expiration.toBuffer("le", 8)),
+  ]);
+
+  return crypto.createHash("sha256").update(data).digest();
+}
+
+/**
+ * Creates an Ed25519 signature for an attestation
+ *
+ * @param statement - The statement object to sign
+ * @param attesterKeypair - The keypair of the attester signing the statement
+ * @returns Uint8Array containing the 64-byte Ed25519 signature
+ */
+export function createAttestationSignature(
+  statement: any,
+  attesterKeypair: Keypair
+): Uint8Array {
+  const messageHash = createMessageHash(statement);
+  return nacl.sign.detached(messageHash, attesterKeypair.secretKey);
 }

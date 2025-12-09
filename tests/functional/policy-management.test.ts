@@ -403,14 +403,14 @@ describe("Policy Management", () => {
       // This test verifies that the stored client_program value matches the PDA derivation source.
       // The PDA is derived from the client_program account's key, and the stored value
       // must match this to ensure validation works correctly.
-      
+
       const [policyPda] = findPolicyPDA(
         counterProgramId,
         context.program.programId
       );
 
       const testPolicyId = "x-consistency-test";
-      
+
       // Set policy for Counter program
       await setPolicyIdOrUpdate(
         context.program,
@@ -440,9 +440,9 @@ describe("Policy Management", () => {
       // This test verifies that a correctly set policy can be used in validation.
       // The constraint in ValidateAttestation checks: policy_account.client_program == target
       // This passes because the stored value matches the PDA derivation source
-      
+
       const testPolicyId = "x-validation-test";
-      
+
       // Set policy for Counter program
       await setPolicyIdOrUpdate(
         context.program,
@@ -457,7 +457,7 @@ describe("Policy Management", () => {
         counterProgramId,
         context.program.programId
       );
-      
+
       const policyAccount = await context.program.account.policyAccount.fetch(
         policyPda
       );
