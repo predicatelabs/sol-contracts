@@ -10,12 +10,11 @@ import {
 } from "../helpers/shared-setup";
 import {
   registerAttesterIfNotExists,
-  setPolicyId,
   setPolicyIdOrUpdate,
   findAttesterPDA,
   findPolicyPDA,
+  createMessageHash,
 } from "../helpers/test-utils";
-import * as crypto from "crypto";
 import * as nacl from "tweetnacl";
 
 describe("Program Security Tests", () => {
@@ -96,28 +95,6 @@ describe("Program Security Tests", () => {
         policyId: testPolicy,
         expiration: new anchor.BN(Math.floor(Date.now() / 1000) + 3600), // 1 hour from now
       };
-    }
-
-    /**
-     * Helper: Create message hash matching hash_statement_safe in Rust
-     */
-    function createMessageHash(statement: any): Buffer {
-      // Hash variable-length fields separately to prevent collisions
-      const encodedSigAndArgsHash = crypto.createHash("sha256").update(statement.encodedSigAndArgs).digest();
-      const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
-      
-      // Concatenate fixed-length fields with hashed variable-length fields
-      const data = Buffer.concat([
-        Buffer.from(statement.uuid),
-        statement.msgSender.toBuffer(),
-        statement.target.toBuffer(),
-        Buffer.from(statement.msgValue.toBuffer("le", 8)),
-        encodedSigAndArgsHash,
-        policyIdHash,
-        Buffer.from(statement.expiration.toBuffer("le", 8)),
-      ]);
-
-      return crypto.createHash("sha256").update(data).digest();
     }
 
     /**

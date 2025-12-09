@@ -1,14 +1,14 @@
 /**
  * UUID Replay Prevention via Cleanup Test
- * 
+ *
  * This test verifies that UUID replay prevention is maintained when cleanup
  * is attempted during the validation buffer window.
- * 
+ *
  * Test scenario:
  * 1. Validate an attestation (creates UUID account)
  * 2. Attempt cleanup while attestation is still within validation buffer
  * 3. Verify cleanup is prevented and UUID account remains
- * 
+ *
  * This ensures UUID accounts cannot be cleaned up while attestations are
  * still valid for validation (within the 30-second buffer window).
  */
@@ -33,6 +33,7 @@ import {
   setPolicyIdOrUpdate,
   findAttesterPDA,
   findPolicyPDA,
+  createMessageHash,
 } from "../helpers/test-utils";
 import nacl from "tweetnacl";
 import * as crypto from "crypto";
@@ -77,7 +78,7 @@ describe("UUID Replay Prevention via Cleanup", () => {
       client.publicKey,
       2 * anchor.web3.LAMPORTS_PER_SOL
     );
-    await connection.confirmTransaction(airdropSig, 'confirmed');
+    await connection.confirmTransaction(airdropSig, "confirmed");
 
     // Set policy for TARGET PROGRAM (not user)
     await setPolicyIdOrUpdate(
@@ -110,23 +111,6 @@ describe("UUID Replay Prevention via Cleanup", () => {
   }
 
   /**
-   * Helper function to create message hash for signing
-   */
-  function createMessageHash(statement: any): Buffer {
-    const data = Buffer.concat([
-      Buffer.from(statement.uuid),
-      statement.msgSender.toBuffer(),
-      statement.target.toBuffer(),
-      Buffer.from(statement.msgValue.toBuffer("le", 8)),
-      statement.encodedSigAndArgs,
-      Buffer.from(statement.policyId, "utf8"),
-      Buffer.from(statement.expiration.toBuffer("le", 8)),
-    ]);
-
-    return crypto.createHash("sha256").update(data).digest();
-  }
-
-  /**
    * Helper function to find used UUID PDA
    */
   function findUsedUuidPDA(uuid: number[]): PublicKey {
@@ -140,12 +124,12 @@ describe("UUID Replay Prevention via Cleanup", () => {
   it("should prevent cleanup when attestation is within validation buffer", async () => {
     // Test scenario: Attempt cleanup while attestation is still valid for validation
     // Cleanup should be prevented to maintain replay protection
-    
+
     // Create an attestation that has expired but is still within the validation buffer
     // This tests the edge case where cleanup might be attempted but validation still works
     const currentTime = Math.floor(Date.now() / 1000);
     const expiredTime = currentTime - 15; // Expired 15 seconds ago (within 30s buffer)
-    
+
     const uuid = Array.from(crypto.randomBytes(16));
     const expiration = new BN(expiredTime);
     const statement = createStatement(uuid, expiration);
@@ -168,7 +152,7 @@ describe("UUID Replay Prevention via Cleanup", () => {
       message: messageHash,
       signature: Buffer.from(signature),
     });
-    
+
     const validateTx1 = await program.methods
       .validateAttestation(
         statement.target,
@@ -193,9 +177,11 @@ describe("UUID Replay Prevention via Cleanup", () => {
     // Verify transaction succeeded and returned a valid signature
     expect(validateTx1).to.be.a("string");
     expect(validateTx1.length).to.be.greaterThan(0);
-    
+
     // Verify UUID account was created with correct data
-    const uuidAccount1 = await program.account.usedUuidAccount.fetch(usedUuidPda);
+    const uuidAccount1 = await program.account.usedUuidAccount.fetch(
+      usedUuidPda
+    );
     expect(uuidAccount1.uuid).to.deep.equal(uuid);
     expect(uuidAccount1.expiresAt.toNumber()).to.equal(expiredTime);
     expect(uuidAccount1.signer).to.deep.equal(client.publicKey);
@@ -210,33 +196,40 @@ describe("UUID Replay Prevention via Cleanup", () => {
           signerRecipient: client.publicKey,
         } as any)
         .rpc();
-      
-      expect.fail("Cleanup should have failed - attestation is still within the 30-second validation buffer");
+
+      expect.fail(
+        "Cleanup should have failed - attestation is still within the 30-second validation buffer"
+      );
     } catch (error: any) {
       // Verify the specific error: StatementNotExpired
       expect(error).to.exist;
       const errorMessage = error.message || String(error);
       expect(
         errorMessage.includes("StatementNotExpired") ||
-        errorMessage.includes("Statement not expired")
+          errorMessage.includes("Statement not expired")
       ).to.be.true;
     }
 
     // Verify UUID account still exists (cleanup was prevented)
     // This ensures replay protection remains intact
-    const uuidAccountAfterCleanupAttempt = await program.account.usedUuidAccount.fetch(usedUuidPda);
+    const uuidAccountAfterCleanupAttempt =
+      await program.account.usedUuidAccount.fetch(usedUuidPda);
     expect(uuidAccountAfterCleanupAttempt.uuid).to.deep.equal(uuid);
-    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(expiredTime);
-    expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(client.publicKey);
+    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(
+      expiredTime
+    );
+    expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(
+      client.publicKey
+    );
   });
 
   it("should prevent cleanup during validation buffer window", async () => {
     // Test scenario: Attempt cleanup while attestation is within validation buffer
     // Cleanup should be prevented to maintain replay protection
-    
+
     const currentTime = Math.floor(Date.now() / 1000);
     const expiredTime = currentTime - 10; // Expired 10 seconds ago (within 30s buffer)
-    
+
     const uuid = Array.from(crypto.randomBytes(16));
     const expiration = new BN(expiredTime);
     const statement = createStatement(uuid, expiration);
@@ -259,7 +252,7 @@ describe("UUID Replay Prevention via Cleanup", () => {
       message: messageHash,
       signature: Buffer.from(signature),
     });
-    
+
     const validateTx1 = await program.methods
       .validateAttestation(
         statement.target,
@@ -295,24 +288,30 @@ describe("UUID Replay Prevention via Cleanup", () => {
           signerRecipient: client.publicKey,
         } as any)
         .rpc();
-      
-      expect.fail("Cleanup should have failed - attestation is still within the 30-second validation buffer");
+
+      expect.fail(
+        "Cleanup should have failed - attestation is still within the 30-second validation buffer"
+      );
     } catch (error: any) {
       // Verify the specific error: StatementNotExpired
       expect(error).to.exist;
       const errorMessage = error.message || String(error);
       expect(
         errorMessage.includes("StatementNotExpired") ||
-        errorMessage.includes("Statement not expired")
+          errorMessage.includes("Statement not expired")
       ).to.be.true;
     }
 
     // Verify UUID account still exists (cleanup was prevented)
     // This ensures replay protection remains intact
-    const uuidAccountAfterCleanupAttempt = await program.account.usedUuidAccount.fetch(usedUuidPda);
+    const uuidAccountAfterCleanupAttempt =
+      await program.account.usedUuidAccount.fetch(usedUuidPda);
     expect(uuidAccountAfterCleanupAttempt.uuid).to.deep.equal(uuid);
-    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(expiredTime);
-    expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(client.publicKey);
+    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(
+      expiredTime
+    );
+    expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(
+      client.publicKey
+    );
   });
 });
-

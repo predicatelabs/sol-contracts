@@ -292,7 +292,9 @@ describe("Attester Management", () => {
         await context.program.account.attesterAccount.fetch(attesterPda);
         expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("Account does not exist or has no data");
+        expect(error.message).to.include(
+          "Account does not exist or has no data"
+        );
       }
 
       // Verify registry statistics
@@ -391,7 +393,9 @@ describe("Attester Management", () => {
         await context.program.account.attesterAccount.fetch(attesterPda);
         expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("Account does not exist or has no data");
+        expect(error.message).to.include(
+          "Account does not exist or has no data"
+        );
       }
 
       // Try to deregister again (should fail because account doesn't exist)
@@ -481,7 +485,9 @@ describe("Attester Management", () => {
         await context.program.account.attesterAccount.fetch(attesterPda);
         expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("Account does not exist or has no data");
+        expect(error.message).to.include(
+          "Account does not exist or has no data"
+        );
       }
 
       // Re-register should now work (account was deleted, so init will succeed)
@@ -510,9 +516,10 @@ describe("Attester Management", () => {
       );
 
       // Get authority balance before registration
-      const authorityBalanceBefore = await context.provider.connection.getBalance(
-        context.authority.keypair.publicKey
-      );
+      const authorityBalanceBefore =
+        await context.provider.connection.getBalance(
+          context.authority.keypair.publicKey
+        );
 
       // Register attester (authority pays rent)
       await registerAttester(
@@ -527,13 +534,13 @@ describe("Attester Management", () => {
         await context.provider.connection.getBalance(
           context.authority.keypair.publicKey
         );
-      const rentPaid = authorityBalanceBefore - authorityBalanceAfterRegistration;
+      const rentPaid =
+        authorityBalanceBefore - authorityBalanceAfterRegistration;
       expect(rentPaid).to.be.greaterThan(0);
 
       // Verify account exists
-      const attesterAccountBefore = await context.program.account.attesterAccount.fetch(
-        attesterPda
-      );
+      const attesterAccountBefore =
+        await context.program.account.attesterAccount.fetch(attesterPda);
       expect(attesterAccountBefore.isRegistered).to.be.true;
 
       // Deregister (should delete account and return rent)
@@ -564,7 +571,9 @@ describe("Attester Management", () => {
         await context.program.account.attesterAccount.fetch(attesterPda);
         expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("Account does not exist or has no data");
+        expect(error.message).to.include(
+          "Account does not exist or has no data"
+        );
       }
     });
 
@@ -621,9 +630,8 @@ describe("Attester Management", () => {
       expect(registry.totalAttesters.toNumber()).to.equal(initialCount + 1);
 
       // Verify account exists and is registered
-      const attesterAccount = await context.program.account.attesterAccount.fetch(
-        attesterPda
-      );
+      const attesterAccount =
+        await context.program.account.attesterAccount.fetch(attesterPda);
       expect(attesterAccount.isRegistered).to.be.true;
       expect(attesterAccount.attester.toString()).to.equal(
         attester1.keypair.publicKey.toString()
@@ -696,7 +704,9 @@ describe("Attester Management", () => {
         await context.program.account.attesterAccount.fetch(attesterPda);
         expect.fail("Account should have been deleted");
       } catch (error: any) {
-        expect(error.message).to.include("Account does not exist or has no data");
+        expect(error.message).to.include(
+          "Account does not exist or has no data"
+        );
       }
 
       // Re-register again
