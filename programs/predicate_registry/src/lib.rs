@@ -158,10 +158,9 @@ pub mod predicate_registry {
     /// * `InvalidClientProgram` - If program doesn't match policy account
     pub fn update_policy_id(
         ctx: Context<UpdatePolicyId>, 
-        client_program: Pubkey,
         policy_id: String
     ) -> Result<()> {
-        instructions::update_policy_id(ctx, client_program, policy_id)
+        instructions::update_policy_id(ctx, policy_id)
     }
 
     /// Validate an attestation for a transaction
