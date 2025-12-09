@@ -297,7 +297,6 @@ describe("Program Security Tests", () => {
               statement.target,
               statement.msgValue,
               statement.encodedSigAndArgs,
-              attester.publicKey,
               attestation
             )
             .accounts({
@@ -372,7 +371,6 @@ describe("Program Security Tests", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -440,7 +438,6 @@ describe("Program Security Tests", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -509,7 +506,6 @@ describe("Program Security Tests", () => {
             tamperedStatement.target,
             tamperedStatement.msgValue,
             tamperedStatement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -602,7 +598,6 @@ describe("Program Security Tests", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({

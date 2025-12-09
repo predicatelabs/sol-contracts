@@ -21,8 +21,7 @@ use anchor_lang::solana_program::{
 /// * `target` - The program being called
 /// * `msg_value` - The value being transferred (typically 0 on Solana)
 /// * `encoded_sig_and_args` - The encoded function signature and arguments
-/// * `attester_key` - The public key of the attester
-/// * `attestation` - The attestation containing uuid, expiration, and signature
+/// * `attestation` - The attestation containing uuid, expiration, signature, and attester
 /// 
 /// # Returns
 /// * `Result<bool>` - True if validation succeeds
@@ -37,7 +36,6 @@ pub fn validate_attestation(
     target: Pubkey,
     msg_value: u64,
     encoded_sig_and_args: Vec<u8>,
-    attester_key: Pubkey,
     attestation: Attestation
 ) -> Result<bool> {
     let registry: &mut Account<'_, crate::PredicateRegistry> = &mut ctx.accounts.registry;
@@ -88,12 +86,6 @@ pub fn validate_attestation(
     require!(
         statement.policy_id == policy_account.policy_id,
         PredicateRegistryError::PolicyIdMismatch
-    );
-
-    // Verify that the attester key matches the provided attester_key parameter
-    require!(
-        attester_key == attester_account.attester,
-        PredicateRegistryError::WrongAttester
     );
 
     // Verify that the attester in the attestation matches the registered attester
