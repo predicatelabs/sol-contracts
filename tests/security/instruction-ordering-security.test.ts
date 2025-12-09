@@ -210,7 +210,6 @@ describe("Program Security Tests", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -275,7 +274,6 @@ describe("Program Security Tests", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -356,7 +354,6 @@ describe("Program Security Tests", () => {
             statement2.target,
             statement2.msgValue,
             statement2.encodedSigAndArgs,
-            attester.publicKey,
             attestation2
           )
           .accounts({

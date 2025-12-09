@@ -73,8 +73,7 @@ pub mod counter {
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
     /// * `encoded_sig_and_args` - The encoded function signature (e.g., "increment()")
-    /// * `attester_key` - The public key of the attester
-    /// * `attestation` - The attestation from the attester
+    /// * `attestation` - The attestation from the attester (contains attester key)
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -84,9 +83,8 @@ pub mod counter {
     pub fn increment(
         ctx: Context<Increment>,
         encoded_sig_and_args: Vec<u8>,
-        attester_key: Pubkey,
         attestation: predicate_registry::Attestation,
     ) -> Result<()> {
-        instructions::increment(ctx, encoded_sig_and_args, attester_key, attestation)
+        instructions::increment(ctx, encoded_sig_and_args, attestation)
     }
 }

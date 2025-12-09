@@ -222,7 +222,6 @@ pub struct UpdatePolicyId<'info> {
     target: Pubkey,
     msg_value: u64,
     encoded_sig_and_args: Vec<u8>,
-    attester_key: Pubkey,
     attestation: Attestation
 )]
 pub struct ValidateAttestation<'info> {    
@@ -236,7 +235,7 @@ pub struct ValidateAttestation<'info> {
     /// The attester account that made the attestation
     #[account(
         mut,
-        seeds = [b"attester", attester_key.as_ref()],
+        seeds = [b"attester", attestation.attester.as_ref()],
         bump,
         constraint = attester_account.is_registered @ PredicateRegistryError::AttesterNotRegisteredForValidation
     )]

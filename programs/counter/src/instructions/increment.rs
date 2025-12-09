@@ -23,8 +23,7 @@ use crate::errors::CounterError;
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
 /// * `encoded_sig_and_args` - The encoded function signature (e.g., "increment()")
-/// * `attester_key` - The public key of the attester
-/// * `attestation` - The attestation from the attester
+/// * `attestation` - The attestation from the attester (contains attester key)
 /// 
 /// # Returns
 /// * `Result<()>` - Success or error
@@ -34,7 +33,6 @@ use crate::errors::CounterError;
 pub fn increment(
     ctx: Context<Increment>,
     encoded_sig_and_args: Vec<u8>,
-    attester_key: Pubkey,
     attestation: Attestation,
 ) -> Result<()> {
     // Validate that the encoded signature is for the increment operation
@@ -63,7 +61,6 @@ pub fn increment(
         crate::ID,              // target: this counter program
         0,                      // msg_value: 0 (Solana doesn't have msg.value)
         encoded_sig_and_args,   // function signature
-        attester_key,
         attestation,
     )?;
 
@@ -102,7 +99,6 @@ fn encode_increment_signature() -> Vec<u8> {
 #[derive(Accounts)]
 #[instruction(
     encoded_sig_and_args: Vec<u8>,
-    attester_key: Pubkey,
     attestation: Attestation
 )]
 pub struct Increment<'info> {

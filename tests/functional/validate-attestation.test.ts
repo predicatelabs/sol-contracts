@@ -198,7 +198,6 @@ describe("Validate Attestation", () => {
           statement.target,
           statement.msgValue,
           statement.encodedSigAndArgs,
-          attester.publicKey,
           attestation
         )
         .accounts({
@@ -251,7 +250,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -297,7 +295,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -343,7 +340,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -396,7 +392,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
@@ -457,7 +452,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            unregisteredAttester.publicKey,
             attestation
           )
           .accounts({
@@ -504,7 +498,6 @@ describe("Validate Attestation", () => {
             statement.target,
             statement.msgValue,
             statement.encodedSigAndArgs,
-            attester.publicKey,
             attestation
           )
           .accounts({
