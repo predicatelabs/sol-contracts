@@ -103,13 +103,18 @@ describe("Program Security Tests", () => {
      * Helper: Create message hash matching hash_statement_safe in Rust
      */
     function createMessageHash(statement: any): Buffer {
+      // Hash variable-length fields separately to prevent collisions
+      const encodedSigAndArgsHash = crypto.createHash("sha256").update(Buffer.from(statement.encodedSigAndArgs)).digest();
+      const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
+      
+      // Concatenate fixed-length fields with hashed variable-length fields
       const data = Buffer.concat([
         Buffer.from(statement.uuid),
         statement.msgSender.toBuffer(),
         statement.target.toBuffer(),
         Buffer.from(statement.msgValue.toBuffer("le", 8)),
-        Buffer.from(statement.encodedSigAndArgs),
-        Buffer.from(statement.policyId, "utf8"),
+        encodedSigAndArgsHash,
+        policyIdHash,
         Buffer.from(statement.expiration.toBuffer("le", 8)),
       ]);
 
