@@ -176,7 +176,6 @@ pub struct SetPolicyId<'info> {
 /// Updates an existing policy for a PROGRAM. Only the program's upgrade
 /// authority can call this instruction.
 #[derive(Accounts)]
-#[instruction(client_program: Pubkey)]
 pub struct UpdatePolicyId<'info> {
     /// The registry account (for event emission)
     #[account(

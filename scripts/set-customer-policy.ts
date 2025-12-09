@@ -92,7 +92,7 @@ async function setCustomerPolicy(customerProgramId: string, policyId: string) {
 
     console.log("\n📝 Updating policy...");
     const tx = await program.methods
-      .updatePolicyId(customerProgram, policyId)
+      .updatePolicyId(policyId)
       .accounts({
         registry: registryPda,
         policyAccount: policyPda,
