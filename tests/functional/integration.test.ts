@@ -851,7 +851,16 @@ describe("Integration Tests", () => {
         context.registry.registryPda
       );
 
-      // Deregister the attestor
+      // Verify registered
+      let attesterAccount = await context.program.account.attesterAccount.fetch(
+        freshAttesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
+        freshAttester.publicKey.toString()
+      );
+
+      // Deregister the attestor (account should be deleted)
       await context.program.methods
         .deregisterAttester(freshAttester.publicKey)
         .accounts({
@@ -862,14 +871,32 @@ describe("Integration Tests", () => {
         .signers([context.authority.keypair])
         .rpc();
 
-      // Verify it's deregistered
-      const deregisteredAccount =
+      // Verify account is deleted
+      try {
         await context.program.account.attesterAccount.fetch(freshAttesterPda);
-      expect(deregisteredAccount.isRegistered).to.be.false;
+        expect.fail("Account should have been deleted");
+      } catch (error: any) {
+        expect(
+          error.message.includes("AccountNotInitialized") ||
+            error.message.includes("Account does not exist") ||
+            error.message.includes("Invalid account data")
+        ).to.be.true;
+      }
 
-      // For now, re-registration of an existing account is not supported
-      // This test verifies that deregistration works correctly
-      expect(deregisteredAccount.attester.toString()).to.equal(
+      // Re-register should now work (account was deleted)
+      await registerAttester(
+        context.program,
+        context.authority.keypair,
+        freshAttester.publicKey,
+        context.registry.registryPda
+      );
+
+      // Verify re-registered
+      attesterAccount = await context.program.account.attesterAccount.fetch(
+        freshAttesterPda
+      );
+      expect(attesterAccount.isRegistered).to.be.true;
+      expect(attesterAccount.attester.toString()).to.equal(
         freshAttester.publicKey.toString()
       );
     });

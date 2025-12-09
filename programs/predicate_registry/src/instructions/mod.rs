@@ -104,16 +104,22 @@ pub struct DeregisterAttester<'info> {
     )]
     pub registry: Account<'info, PredicateRegistry>,
     
-    /// The attester account to be deregistered
+    /// The attester account to be deregistered and closed
+    /// Closing the account returns rent to the current registry authority
+    /// Note: If authority was transferred, the current authority receives the rent
     #[account(
         mut,
+        close = authority,
         seeds = [b"attester", attester.as_ref()],
         bump,
         constraint = attester_account.is_registered @ PredicateRegistryError::AttesterNotRegistered
     )]
     pub attester_account: Account<'info, AttesterAccount>,
     
-    /// The registry authority
+    /// The registry authority (receives rent refund from closed account)
+    /// Must be mutable to receive lamports from the closed account
+    /// Security: Protected by `has_one` constraint ensuring only current authority can call this
+    #[account(mut)]
     pub authority: Signer<'info>,
 }
 
