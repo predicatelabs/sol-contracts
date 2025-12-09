@@ -124,7 +124,6 @@ pub struct DeregisterAttester<'info> {
 /// - Verifies the signer is the program's upgrade authority
 /// - Stores both the program address and the authority
 #[derive(Accounts)]
-#[instruction(client_program: Pubkey)]
 pub struct SetPolicyId<'info> {
     /// The registry account (for event emission and stats tracking)
     #[account(

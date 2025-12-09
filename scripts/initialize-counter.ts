@@ -278,7 +278,7 @@ async function setPolicyId(
   );
 
   const tx = await predicateProgram.methods
-    .setPolicyId(counterProgram.programId, policy)
+    .setPolicyId(policy)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,

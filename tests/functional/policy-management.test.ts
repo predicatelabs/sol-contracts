@@ -30,7 +30,7 @@ describe("Policy Management", () => {
   before(async () => {
     context = await setupSharedTestContext();
 
-    // Get Counter program (policies are now set for programs, not users)
+    // Get Counter program (policies are set for programs, not users)
     counterProgram = anchor.workspace.Counter as Program<Counter>;
     counterProgramId = counterProgram.programId;
   });
@@ -147,7 +147,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .setPolicyId(counterProgramId, mediumPolicyId)
+          .setPolicyId(mediumPolicyId)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -395,6 +395,79 @@ describe("Policy Management", () => {
       expect(registryAfter2.totalPolicies.toNumber()).to.be.at.most(
         initialCount + 1
       );
+    });
+  });
+
+  describe("Policy Account Consistency", () => {
+    it("should store client_program value that matches PDA derivation", async () => {
+      // This test verifies that the stored client_program value matches the PDA derivation source.
+      // The PDA is derived from the client_program account's key, and the stored value
+      // must match this to ensure validation works correctly.
+      
+      const [policyPda] = findPolicyPDA(
+        counterProgramId,
+        context.program.programId
+      );
+
+      const testPolicyId = "x-consistency-test";
+      
+      // Set policy for Counter program
+      await setPolicyIdOrUpdate(
+        context.program,
+        counterProgramId,
+        context.authority.keypair,
+        testPolicyId,
+        context.registry.registryPda
+      );
+
+      // Fetch the policy account
+      const policyAccount = await context.program.account.policyAccount.fetch(
+        policyPda
+      );
+
+      // Verify the stored client_program matches the PDA derivation source
+      // The PDA is derived from counterProgramId, so the stored value must match
+      expect(policyAccount.clientProgram.toString()).to.equal(
+        counterProgramId.toString()
+      );
+
+      // Verify the PDA was derived correctly (implicitly tested by fetch succeeding)
+      // If the PDA didn't match, the fetch would fail or return wrong account
+      expect(policyAccount.policyId).to.equal(testPolicyId);
+    });
+
+    it("should allow validation to succeed with correctly set policy", async () => {
+      // This test verifies that a correctly set policy can be used in validation.
+      // The constraint in ValidateAttestation checks: policy_account.client_program == target
+      // This passes because the stored value matches the PDA derivation source
+      
+      const testPolicyId = "x-validation-test";
+      
+      // Set policy for Counter program
+      await setPolicyIdOrUpdate(
+        context.program,
+        counterProgramId,
+        context.authority.keypair,
+        testPolicyId,
+        context.registry.registryPda
+      );
+
+      // Verify the policy account exists and has correct values
+      const [policyPda] = findPolicyPDA(
+        counterProgramId,
+        context.program.programId
+      );
+      
+      const policyAccount = await context.program.account.policyAccount.fetch(
+        policyPda
+      );
+
+      // Verify stored client_program matches the target program
+      // This is what ValidateAttestation checks in its constraint
+      expect(policyAccount.clientProgram.toString()).to.equal(
+        counterProgramId.toString()
+      );
+      expect(policyAccount.policyId).to.equal(testPolicyId);
     });
   });
 });

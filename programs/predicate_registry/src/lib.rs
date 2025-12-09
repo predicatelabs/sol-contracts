@@ -113,7 +113,6 @@ pub mod predicate_registry {
     /// 
     /// # Arguments
     /// * `ctx` - The instruction context containing accounts
-    /// * `client_program` - The program address that this policy applies to
     /// * `policy_id` - The policy ID string (max 64 bytes)
     /// 
     /// # Returns
@@ -129,10 +128,9 @@ pub mod predicate_registry {
     /// * `InvalidProgramData` - If program data account is invalid
     pub fn set_policy_id(
         ctx: Context<SetPolicyId>, 
-        client_program: Pubkey,
         policy_id: String
     ) -> Result<()> {
-        instructions::set_policy_id(ctx, client_program, policy_id)
+        instructions::set_policy_id(ctx, policy_id)
     }
 
     /// Update an existing policy ID for a client program
