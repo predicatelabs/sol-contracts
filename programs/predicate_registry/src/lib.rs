@@ -179,8 +179,7 @@ pub mod predicate_registry {
     /// * `target` - The program being called (e.g., counter program ID)
     /// * `msg_value` - The value being transferred (typically 0 on Solana)
     /// * `encoded_sig_and_args` - The encoded function signature and arguments
-    /// * `attester_key` - The public key of the attester
-    /// * `attestation` - The attestation containing uuid, expiration, and signature
+    /// * `attestation` - The attestation containing uuid, expiration, signature, and attester
     /// 
     /// # Returns
     /// * `Result<()>` - Success or error
@@ -202,7 +201,6 @@ pub mod predicate_registry {
         target: Pubkey,
         msg_value: u64,
         encoded_sig_and_args: Vec<u8>,
-        attester_key: Pubkey,
         attestation: Attestation
     ) -> Result<()> {
         instructions::validate_attestation(
@@ -210,7 +208,6 @@ pub mod predicate_registry {
             target,
             msg_value,
             encoded_sig_and_args,
-            attester_key,
             attestation
         ).map(|_| ())
     }

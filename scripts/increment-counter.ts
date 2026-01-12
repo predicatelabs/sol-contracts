@@ -384,8 +384,7 @@ async function incrementCounter(
   const incrementInstruction = await counterProgram.methods
     .increment(
       statement.encodedSigAndArgs, // encoded_sig_and_args
-      attester.publicKey, // attester_key
-      attestation // attestation
+      attestation // attestation (contains attester key)
     )
     .accounts({
       counter: pdas.counterPda,
