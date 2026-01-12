@@ -29,12 +29,8 @@ pub fn cleanup_expired_uuid(ctx: Context<CleanupExpiredUuid>) -> Result<()> {
     let clock = Clock::get().map_err(|_| PredicateRegistryError::ClockError)?;
     let current_timestamp = clock.unix_timestamp;
     
-    // Check that the statement has expired AND the validation buffer window has passed
-    // This matches the validation logic which allows attestations to be valid for
-    // up to CLOCK_DRIFT_BUFFER seconds after expiration.
-    // We must prevent cleanup during this window to maintain replay protection.
     require!(
-        current_timestamp > used_uuid_account.expires_at + crate::instructions::CLOCK_DRIFT_BUFFER,
+        used_uuid_account.attestation.is_expired(current_timestamp),
         PredicateRegistryError::StatementNotExpired
     );
     

@@ -55,16 +55,19 @@ pub struct PolicyAccount {
     pub updated_at: i64,
 }
 
-/// Account for tracking used UUIDs to prevent replay attacks
+/// Account for tracking used attestations to prevent replay attacks
+/// 
+/// This account stores the full attestation that was used, allowing for:
+/// - Replay protection via UUID uniqueness
+/// - Centralized expiration checking via `attestation.is_expired()`
+/// - Complete audit trail of validated attestations
 #[account]
 #[derive(InitSpace)]
 pub struct UsedUuidAccount {
-    /// The UUID that was used (16 bytes)
-    pub uuid: [u8; 16],
-    /// When it was first used
+    /// The attestation that was validated and marked as used
+    pub attestation: Attestation,
+    /// When the attestation was first validated
     pub used_at: i64,
-    /// When the statement expires (for cleanup eligibility)
-    pub expires_at: i64,
     /// Who performed the validation (the transaction signer)
     pub signer: Pubkey,
 }
@@ -91,7 +94,13 @@ pub struct Statement {
 }
 
 /// Attestation structure matching the Solidity version
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+/// 
+/// An attestation is a signed statement from a registered attester that
+/// authorizes a specific transaction. It contains:
+/// - A unique UUID for replay protection
+/// - The attester's identity and signature
+/// - An expiration timestamp after which the attestation is no longer valid
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct Attestation {
     /// Unique identifier matching the statement (UUID as 16 bytes)
     pub uuid: [u8; 16],
@@ -101,6 +110,51 @@ pub struct Attestation {
     pub signature: [u8; 64], // Ed25519 signature
     /// Expiration timestamp
     pub expiration: i64,
+}
+
+impl Attestation {
+    /// Check if the attestation is still valid at the given timestamp
+    /// 
+    /// An attestation is valid if the current timestamp is within the expiration
+    /// window, including a buffer for clock drift between systems.
+    /// 
+    /// # Arguments
+    /// * `current_timestamp` - The current Unix timestamp to check against
+    /// 
+    /// # Returns
+    /// * `true` if the attestation is still valid for use
+    /// * `false` if the attestation has expired
+    pub fn is_valid_at(&self, current_timestamp: i64) -> bool {
+        current_timestamp <= self.expiration + crate::instructions::CLOCK_DRIFT_BUFFER
+    }
+
+    /// Check if the attestation has fully expired at the given timestamp
+    /// 
+    /// An attestation is fully expired when the current timestamp is past
+    /// both the expiration time AND the clock drift buffer window.
+    /// This is the inverse of `is_valid_at()`.
+    /// 
+    /// # Arguments
+    /// * `current_timestamp` - The current Unix timestamp to check against
+    /// 
+    /// # Returns
+    /// * `true` if the attestation has fully expired (safe for cleanup)
+    /// * `false` if the attestation is still within its validity window
+    pub fn is_expired(&self, current_timestamp: i64) -> bool {
+        current_timestamp > self.expiration + crate::instructions::CLOCK_DRIFT_BUFFER
+    }
+
+    /// Format UUID with standard dashes (8-4-4-4-12 format)
+    pub fn format_uuid(&self) -> String {
+        let hex = hex::encode(self.uuid);
+        format!("{}-{}-{}-{}-{}", 
+            &hex[0..8], 
+            &hex[8..12], 
+            &hex[12..16], 
+            &hex[16..20], 
+            &hex[20..32]
+        )
+    }
 }
 
 impl PredicateRegistry {
@@ -170,6 +224,20 @@ impl AttesterAccount {
 }
 
 impl PolicyAccount {
+    /// Validate policy ID format constraints
+    /// 
+    /// Ensures the policy ID:
+    /// - Is not empty
+    /// - Does not exceed 64 characters
+    /// 
+    /// This is the single source of truth for policy ID validation,
+    /// called by both `initialize()` and `update_policy_id()`.
+    pub fn validate_policy_id(policy_id: &str) -> Result<()> {
+        require!(!policy_id.is_empty(), crate::PredicateRegistryError::InvalidPolicyId);
+        require!(policy_id.len() <= 64, crate::PredicateRegistryError::PolicyIdTooLong);
+        Ok(())
+    }
+
     /// Initialize a new policy account
     pub fn initialize(
         &mut self, 
@@ -178,8 +246,7 @@ impl PolicyAccount {
         policy_id: String, 
         clock: &Clock
     ) -> Result<()> {
-        require!(policy_id.len() <= 64, crate::PredicateRegistryError::PolicyIdTooLong);
-        require!(!policy_id.is_empty(), crate::PredicateRegistryError::InvalidPolicyId);
+        Self::validate_policy_id(&policy_id)?;
         
         self.client_program = client_program;
         self.authority = authority;
@@ -191,8 +258,7 @@ impl PolicyAccount {
 
     /// Update the policy ID
     pub fn update_policy_id(&mut self, policy_id: String, clock: &Clock) -> Result<()> {
-        require!(policy_id.len() <= 64, crate::PredicateRegistryError::PolicyIdTooLong);
-        require!(!policy_id.is_empty(), crate::PredicateRegistryError::InvalidPolicyId);
+        Self::validate_policy_id(&policy_id)?;
         
         self.policy_id = policy_id;
         self.updated_at = clock.unix_timestamp;

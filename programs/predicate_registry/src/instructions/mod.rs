@@ -29,6 +29,64 @@ pub mod transfer_authority;
 /// - `cleanup_expired_uuid`: Prevents cleanup if `current_timestamp <= expiration + CLOCK_DRIFT_BUFFER`
 pub const CLOCK_DRIFT_BUFFER: i64 = 30; // 30 seconds
 
+/// Verify that the signer is the upgrade authority for a given program
+/// 
+/// Parses the ProgramData account to extract and validate the upgrade authority.
+/// This is the single source of truth for upgrade authority verification,
+/// used by both `set_policy_id` and `update_policy_id`.
+/// 
+/// # Arguments
+/// * `program_data` - The ProgramData account for the target program
+/// * `expected_authority` - The signer's public key to verify
+/// 
+/// # Returns
+/// * `Ok(())` if the signer matches the upgrade authority
+/// * `Err(InvalidProgramData)` if the account format is invalid
+/// * `Err(Unauthorized)` if no authority exists or signer doesn't match
+/// 
+/// # ProgramData Account Layout
+/// - Bytes 0-3: discriminator (3 for ProgramData)
+/// - Bytes 4-11: slot (u64)
+/// - Byte 12: option byte (1 if Some, 0 if None)
+/// - Bytes 13-44: upgrade authority (32 bytes if Some)
+pub fn verify_upgrade_authority(
+    program_data: &AccountInfo,
+    expected_authority: &Pubkey,
+) -> Result<()> {
+    let program_data_bytes = program_data.try_borrow_data()?;
+    
+    // Validate minimum length for ProgramData account
+    if program_data_bytes.len() < 45 {
+        return Err(PredicateRegistryError::InvalidProgramData.into());
+    }
+    
+    // Check discriminator (should be 3 for ProgramData)
+    let discriminator = u32::from_le_bytes([
+        program_data_bytes[0],
+        program_data_bytes[1],
+        program_data_bytes[2],
+        program_data_bytes[3],
+    ]);
+    require!(discriminator == 3, PredicateRegistryError::InvalidProgramData);
+    
+    // Check if upgrade authority is Some (byte 12 == 1)
+    let has_authority = program_data_bytes[12] == 1;
+    require!(has_authority, PredicateRegistryError::Unauthorized);
+    
+    // Extract upgrade authority (bytes 13-44)
+    let mut authority_bytes = [0u8; 32];
+    authority_bytes.copy_from_slice(&program_data_bytes[13..45]);
+    let upgrade_authority = Pubkey::new_from_array(authority_bytes);
+    
+    // Verify the signer matches the upgrade authority
+    require!(
+        upgrade_authority == *expected_authority,
+        PredicateRegistryError::Unauthorized
+    );
+    
+    Ok(())
+}
+
 // Re-export instruction functions
 pub use initialize::*;
 pub use register_attester::*;
@@ -296,7 +354,7 @@ pub struct CleanupExpiredUuid<'info> {
     #[account(
         mut,
         close = signer_recipient,
-        seeds = [b"used_uuid", &used_uuid_account.uuid],
+        seeds = [b"used_uuid", &used_uuid_account.attestation.uuid],
         bump,
         // Enforce rent refund goes to the original payer
         // This prevents unauthorized rent theft
