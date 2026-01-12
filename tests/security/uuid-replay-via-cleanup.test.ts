@@ -114,12 +114,16 @@ describe("UUID Replay Prevention via Cleanup", () => {
    * Helper function to create message hash for signing
    */
   function createMessageHash(statement: any): Buffer {
+    // Domain separator to prevent signature reuse across contexts
+    const domainSeparator = Buffer.from("predicate_solana_attestation");
+
     // Hash variable-length fields separately to prevent collisions
     const encodedSigAndArgsHash = crypto.createHash("sha256").update(statement.encodedSigAndArgs).digest();
     const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
     
-    // Concatenate fixed-length fields with hashed variable-length fields
+    // Concatenate domain separator with fixed-length fields and hashed variable-length fields
     const data = Buffer.concat([
+      domainSeparator,
       Buffer.from(statement.uuid),
       statement.msgSender.toBuffer(),
       statement.target.toBuffer(),
@@ -181,7 +185,6 @@ describe("UUID Replay Prevention via Cleanup", () => {
         statement.target,
         statement.msgValue,
         statement.encodedSigAndArgs,
-        attester.publicKey,
         attestation
       )
       .accounts({
@@ -205,8 +208,8 @@ describe("UUID Replay Prevention via Cleanup", () => {
     const uuidAccount1 = await program.account.usedUuidAccount.fetch(
       usedUuidPda
     );
-    expect(uuidAccount1.uuid).to.deep.equal(uuid);
-    expect(uuidAccount1.expiresAt.toNumber()).to.equal(expiredTime);
+    expect(uuidAccount1.attestation.uuid).to.deep.equal(uuid);
+    expect(uuidAccount1.attestation.expiration.toNumber()).to.equal(expiredTime);
     expect(uuidAccount1.signer).to.deep.equal(client.publicKey);
 
     // Attempt cleanup - should fail because attestation is still within validation buffer
@@ -237,8 +240,8 @@ describe("UUID Replay Prevention via Cleanup", () => {
     // This ensures replay protection remains intact
     const uuidAccountAfterCleanupAttempt =
       await program.account.usedUuidAccount.fetch(usedUuidPda);
-    expect(uuidAccountAfterCleanupAttempt.uuid).to.deep.equal(uuid);
-    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(
+    expect(uuidAccountAfterCleanupAttempt.attestation.uuid).to.deep.equal(uuid);
+    expect(uuidAccountAfterCleanupAttempt.attestation.expiration.toNumber()).to.equal(
       expiredTime
     );
     expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(
@@ -281,7 +284,6 @@ describe("UUID Replay Prevention via Cleanup", () => {
         statement.target,
         statement.msgValue,
         statement.encodedSigAndArgs,
-        attester.publicKey,
         attestation
       )
       .accounts({
@@ -329,8 +331,8 @@ describe("UUID Replay Prevention via Cleanup", () => {
     // This ensures replay protection remains intact
     const uuidAccountAfterCleanupAttempt =
       await program.account.usedUuidAccount.fetch(usedUuidPda);
-    expect(uuidAccountAfterCleanupAttempt.uuid).to.deep.equal(uuid);
-    expect(uuidAccountAfterCleanupAttempt.expiresAt.toNumber()).to.equal(
+    expect(uuidAccountAfterCleanupAttempt.attestation.uuid).to.deep.equal(uuid);
+    expect(uuidAccountAfterCleanupAttempt.attestation.expiration.toNumber()).to.equal(
       expiredTime
     );
     expect(uuidAccountAfterCleanupAttempt.signer).to.deep.equal(
