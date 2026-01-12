@@ -10,7 +10,6 @@ import {
 } from "@solana/web3.js";
 import { expect } from "chai";
 import * as crypto from "crypto";
-import * as nacl from "tweetnacl";
 import {
   setupSharedTestContext,
   SharedTestContext,
@@ -20,12 +19,13 @@ import {
   findAttesterPDA,
   findPolicyPDA,
   registerAttesterIfNotExists,
-  setPolicyId,
   setPolicyIdOrUpdate,
   getFutureTimestamp,
   getPastTimestamp,
   expectError,
   findUsedUuidPDA,
+  createMessageHash,
+  createAttestationSignature,
 } from "../helpers/test-utils";
 
 describe("Validate Attestation", () => {
@@ -105,47 +105,6 @@ describe("Validate Attestation", () => {
   }
 
   /**
-   * Helper function to create message hash matching Rust implementation
-   * This matches the hash_statement_safe function in state.rs
-   */
-  function createMessageHash(statement: any): Buffer {
-    // Hash variable-length fields separately to prevent collisions
-    const encodedSigAndArgsHash = crypto.createHash("sha256").update(statement.encodedSigAndArgs).digest();
-    const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
-    
-    // Concatenate fixed-length fields with hashed variable-length fields
-    const data = Buffer.concat([
-      Buffer.from(statement.uuid),
-      statement.msgSender.toBuffer(),
-      statement.target.toBuffer(), // target (client program ID)
-      Buffer.from(statement.msgValue.toBuffer("le", 8)),
-      encodedSigAndArgsHash,
-      policyIdHash,
-      Buffer.from(statement.expiration.toBuffer("le", 8)),
-    ]);
-
-    // Hash the data using SHA-256 (Solana's hash function)
-    return crypto.createHash("sha256").update(data).digest();
-  }
-
-  /**
-   * Helper function to create an Ed25519 signature matching Rust implementation
-   */
-  function createSignature(
-    statement: any,
-    attesterKeypair: Keypair
-  ): Uint8Array {
-    const messageHash = createMessageHash(statement);
-
-    // Sign with Ed25519 using NaCl/TweetNaCl
-    const signature = nacl.sign.detached(
-      messageHash,
-      attesterKeypair.secretKey
-    );
-    return signature;
-  }
-
-  /**
    * Helper function to create an attestation
    */
   function createAttestation(
@@ -169,7 +128,7 @@ describe("Validate Attestation", () => {
       const statement = createStatement(uuid, expiration);
 
       // Create signature
-      const signature = createSignature(statement, attester);
+      const signature = createAttestationSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -231,7 +190,7 @@ describe("Validate Attestation", () => {
       const expiration = getPastTimestamp(3600); // 1 hour ago
       const statement = createStatement(uuid, expiration);
 
-      const signature = createSignature(statement, attester);
+      const signature = createAttestationSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -276,7 +235,7 @@ describe("Validate Attestation", () => {
       const expiration = getFutureTimestamp(3600);
 
       const statement = createStatement(statementUuid, expiration);
-      const signature = createSignature(statement, attester);
+      const signature = createAttestationSignature(statement, attester);
       const attestation = createAttestation(
         attestationUuid,
         attester,
@@ -373,7 +332,7 @@ describe("Validate Attestation", () => {
       const statement = createStatement(uuid, expiration);
 
       // Sign with wrong attester
-      const signature = createSignature(statement, wrongAttester);
+      const signature = createAttestationSignature(statement, wrongAttester);
       const attestation = createAttestation(
         uuid,
         attester,
@@ -428,7 +387,10 @@ describe("Validate Attestation", () => {
       const expiration = getFutureTimestamp(3600);
       const statement = createStatement(uuid, expiration);
 
-      const signature = createSignature(statement, unregisteredAttester);
+      const signature = createAttestationSignature(
+        statement,
+        unregisteredAttester
+      );
       const attestation = createAttestation(
         uuid,
         unregisteredAttester,
@@ -479,7 +441,7 @@ describe("Validate Attestation", () => {
       const attestationExpiration = getFutureTimestamp(7200); // Different expiration
 
       const statement = createStatement(uuid, statementExpiration);
-      const signature = createSignature(statement, attester);
+      const signature = createAttestationSignature(statement, attester);
       const attestation = createAttestation(
         uuid,
         attester,

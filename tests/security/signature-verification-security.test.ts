@@ -38,6 +38,8 @@ import {
   registerAttesterIfNotExists,
   setPolicyId,
   getFutureTimestamp,
+  createMessageHash,
+  createAttestationSignature,
 } from "../helpers/test-utils";
 
 describe("Program Security Tests", () => {
@@ -98,28 +100,6 @@ describe("Program Security Tests", () => {
         console.log("Policy already set:", error.message);
       }
     });
-
-    /**
-     * Helper: Create message hash matching hash_statement_safe in Rust
-     */
-    function createMessageHash(statement: any): Buffer {
-      // Hash variable-length fields separately to prevent collisions
-      const encodedSigAndArgsHash = crypto.createHash("sha256").update(Buffer.from(statement.encodedSigAndArgs)).digest();
-      const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
-      
-      // Concatenate fixed-length fields with hashed variable-length fields
-      const data = Buffer.concat([
-        Buffer.from(statement.uuid),
-        statement.msgSender.toBuffer(),
-        statement.target.toBuffer(),
-        Buffer.from(statement.msgValue.toBuffer("le", 8)),
-        encodedSigAndArgsHash,
-        policyIdHash,
-        Buffer.from(statement.expiration.toBuffer("le", 8)),
-      ]);
-
-      return Buffer.from(crypto.createHash("sha256").update(data).digest());
-    }
 
     /**
      * Helper: Create a valid statement
