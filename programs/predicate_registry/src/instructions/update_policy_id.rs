@@ -12,7 +12,6 @@ use crate::errors::PredicateRegistryError;
 /// 
 /// # Arguments
 /// * `ctx` - The instruction context containing accounts
-/// * `client_program` - The program address that this policy applies to
 /// * `policy_id` - The new policy ID string to set
 /// 
 /// # Returns
@@ -23,7 +22,6 @@ use crate::errors::PredicateRegistryError;
 /// - Policy PDA is derived from the program address, not the user
 pub fn update_policy_id(
     ctx: Context<UpdatePolicyId>, 
-    client_program: Pubkey,
     policy_id: String
 ) -> Result<()> {
     require!(!policy_id.is_empty(), PredicateRegistryError::InvalidPolicyId);
@@ -70,10 +68,10 @@ pub fn update_policy_id(
     let policy_account = &mut ctx.accounts.policy_account;
     let clock = Clock::get()?;
 
+    let client_program = ctx.accounts.client_program.key();
     let previous_policy_id = policy_account.policy_id.clone();
     policy_account.update_policy_id(policy_id.clone(), &clock)?;
     
-    // Update registry timestamp
     registry.updated_at = clock.unix_timestamp;
 
     emit!(PolicyUpdated {

@@ -207,6 +207,50 @@ describe("Policy Management", () => {
       expect(policyAfter.setAt.toNumber()).to.equal(setAtBefore); // Should not change
     });
 
+    it("Should emit PolicyUpdated event with correct client_program", async () => {
+      const [policyPda] = findPolicyPDA(
+        counterProgramId,
+        context.program.programId
+      );
+      const policyBefore = await context.program.account.policyAccount.fetch(
+        policyPda
+      );
+      const previousPolicyId = policyBefore.policyId;
+      let eventReceived = false;
+
+      const listener = context.program.addEventListener(
+        "policyUpdated",
+        (event: any) => {
+          expect(event.registry.toString()).to.equal(
+            context.registry.registryPda.toString()
+          );
+          expect(event.clientProgram.toString()).to.equal(
+            counterProgramId.toString()
+          );
+          expect(event.authority.toString()).to.equal(
+            context.authority.keypair.publicKey.toString()
+          );
+          expect(event.previousPolicyId).to.equal(previousPolicyId);
+          expect(event.newPolicyId).to.equal(updatedPolicyId);
+          expect(event.timestamp.toNumber()).to.be.greaterThan(0);
+          eventReceived = true;
+        }
+      );
+
+      await updatePolicyId(
+        context.program,
+        counterProgramId,
+        context.authority.keypair,
+        updatedPolicyId,
+        context.registry.registryPda
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(eventReceived).to.be.true;
+
+      await context.program.removeEventListener(listener);
+    });
+
     it("Should NOT increment registry policy count when updating existing policy", async () => {
       const [policyPda] = findPolicyPDA(
         counterProgramId,
@@ -252,7 +296,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .updatePolicyId(counterProgramId, updatedPolicyId)
+          .updatePolicyId(updatedPolicyId)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,
@@ -285,7 +329,7 @@ describe("Policy Management", () => {
 
       try {
         await context.program.methods
-          .updatePolicyId(programWithoutPolicy, updatedPolicyId)
+          .updatePolicyId(updatedPolicyId)
           .accounts({
             registry: context.registry.registryPda,
             policyAccount: policyPda,

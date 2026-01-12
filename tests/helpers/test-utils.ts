@@ -305,7 +305,7 @@ export async function updatePolicyId(
   );
 
   return await program.methods
-    .updatePolicyId(clientProgram, policyId)
+    .updatePolicyId(policyId)
     .accounts({
       registry: registryPda,
       policyAccount: policyPda,

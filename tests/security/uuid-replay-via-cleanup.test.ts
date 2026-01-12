@@ -111,6 +111,29 @@ describe("UUID Replay Prevention via Cleanup", () => {
   }
 
   /**
+   * Helper function to create message hash for signing
+   */
+  function createMessageHash(statement: any): Buffer {
+    // Hash variable-length fields separately to prevent collisions
+    const encodedSigAndArgsHash = crypto.createHash("sha256").update(statement.encodedSigAndArgs).digest();
+    const policyIdHash = crypto.createHash("sha256").update(Buffer.from(statement.policyId, "utf8")).digest();
+    
+    // Concatenate fixed-length fields with hashed variable-length fields
+    const data = Buffer.concat([
+      Buffer.from(statement.uuid),
+      statement.msgSender.toBuffer(),
+      statement.target.toBuffer(),
+      Buffer.from(statement.msgValue.toBuffer("le", 8)),
+      encodedSigAndArgsHash,
+      policyIdHash,
+      Buffer.from(statement.expiration.toBuffer("le", 8)),
+    ]);
+
+    // Hash the data using SHA-256 (Solana's hash function)
+    return crypto.createHash("sha256").update(data).digest();
+  }
+
+  /**
    * Helper function to find used UUID PDA
    */
   function findUsedUuidPDA(uuid: number[]): PublicKey {
