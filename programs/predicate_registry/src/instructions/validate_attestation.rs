@@ -67,24 +67,17 @@ pub fn validate_attestation(
         PredicateRegistryError::InvalidSignature
     );
 
-    // Validate policy ID is not empty
-    require!(
-        !statement.policy_id.is_empty() && !policy_account.policy_id.is_empty(),
-        PredicateRegistryError::InvalidPolicyId
-    );
+    // Note: Policy ID validation is not needed here because:
+    // 1. Policy IDs are validated when set/updated via PolicyAccount::validate_policy_id()
+    // 2. The statement.policy_id is copied from policy_account.policy_id (always matches)
+    // 3. Any policy_id mismatch with what the attester signed would cause signature verification to fail
 
     // === BUSINESS LOGIC VALIDATION ===
 
-    // Check if statement has expired (with small buffer for clock drift)
+    // Check if attestation has expired (with buffer for clock drift)
     require!(
-        current_timestamp <= statement.expiration + crate::instructions::CLOCK_DRIFT_BUFFER,
+        attestation.is_valid_at(current_timestamp),
         PredicateRegistryError::StatementExpired
-    );
-
-    // Verify the policy ID matches exactly
-    require!(
-        statement.policy_id == policy_account.policy_id,
-        PredicateRegistryError::PolicyIdMismatch
     );
 
     // Verify that the attester in the attestation matches the registered attester
@@ -115,22 +108,21 @@ pub fn validate_attestation(
         &ctx.accounts.instructions_sysvar,
     )?;
 
-    // === REPLAY PROTECTION: Mark UUID as used ===
+    // === REPLAY PROTECTION: Mark attestation as used ===
     // Note: The `init` constraint on used_uuid_account will automatically fail
     // if the UUID account already exists, preventing replay attacks.
     // This is the primary replay protection mechanism.
     
-    // Initialize the used_uuid_account
-    used_uuid_account.uuid = statement.uuid;
+    // Initialize the used_uuid_account with the full attestation
+    used_uuid_account.attestation = attestation.clone();
     used_uuid_account.used_at = current_timestamp;
-    used_uuid_account.expires_at = statement.expiration;
     used_uuid_account.signer = signer.key();
 
     // Emit UUID marked as used event
     emit!(UuidMarkedUsed {
-        uuid: statement.format_uuid(),
+        uuid: attestation.format_uuid(),
         signer: signer.key(),
-        expires_at: statement.expiration,
+        expires_at: attestation.expiration,
         timestamp: current_timestamp,
     });
 

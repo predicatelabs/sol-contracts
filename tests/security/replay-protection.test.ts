@@ -172,7 +172,7 @@ describe("Program Security Tests", () => {
         const usedUuidAccount = await program.account.usedUuidAccount.fetch(
           usedUuidPda
         );
-        expect(Buffer.from(usedUuidAccount.uuid)).to.deep.equal(
+        expect(Buffer.from(usedUuidAccount.attestation.uuid)).to.deep.equal(
           Buffer.from(uuid)
         );
         expect(usedUuidAccount.signer.toString()).to.equal(
