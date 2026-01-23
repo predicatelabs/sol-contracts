@@ -150,12 +150,17 @@ pub struct SetPolicyId<'info> {
     pub policy_account: Account<'info, PolicyAccount>,
     
     /// The client program that this policy applies to
-    /// CHECK: Can be any program address; verified via program_data
+    /// 
+    /// CHECK: This must be a deployed BPF Upgradeable program. Security is enforced by:
+    /// 1. `program_data` PDA is derived from this address (see seeds below)
+    /// 2. `verify_upgrade_authority()` validates the signer is this program's upgrade authority
+    /// 3. `policy_account` PDA is also derived from this address, ensuring consistency
     pub client_program: AccountInfo<'info>,
     
     /// The program data account for the client program
-    /// This is used to verify the upgrade authority
-    /// CHECK: Verified via seeds and deserialization in instruction logic
+    /// 
+    /// CHECK: PDA derived from `client_program` via BPF Loader Upgradeable.
+    /// The upgrade authority is extracted and verified in `verify_upgrade_authority()`.
     #[account(
         seeds = [client_program.key().as_ref()],
         bump,
@@ -195,11 +200,17 @@ pub struct UpdatePolicyId<'info> {
     pub policy_account: Account<'info, PolicyAccount>,
     
     /// The client program (for PDA derivation)
-    /// CHECK: Verified via policy_account constraint
+    /// 
+    /// CHECK: This must be a deployed BPF Upgradeable program. Security is enforced by:
+    /// 1. `policy_account` constraint ensures this matches the stored `client_program`
+    /// 2. `program_data` PDA is derived from this address (see seeds below)
+    /// 3. `verify_upgrade_authority()` validates the signer is this program's upgrade authority
     pub client_program: AccountInfo<'info>,
     
     /// The program data account for the client program
-    /// CHECK: Verified via seeds and deserialization in instruction logic
+    /// 
+    /// CHECK: PDA derived from `client_program` via BPF Loader Upgradeable.
+    /// The upgrade authority is extracted and verified in `verify_upgrade_authority()`.
     #[account(
         seeds = [client_program.key().as_ref()],
         bump,
